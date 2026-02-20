@@ -1,3 +1,10 @@
 /log
 /build
 /install
+
+# Ignore python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
