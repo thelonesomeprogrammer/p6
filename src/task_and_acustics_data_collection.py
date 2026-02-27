@@ -20,7 +20,6 @@ today = datetime.today().strftime('%d%m%Y')
 def PLCsignal(db_number, start_offset, bit_offset):
     reading = client.db_read(db_number, start_offset, 1)
     a = snap7.util.get_bool(reading, 0, bit_offset)
-    #print('DB Number: ' + str(db_number) + ' Bit: ' + str(start_offset) + '.' + str(bit_offset) + ' Value: ' + str(a))
     return a
 
 
@@ -60,8 +59,6 @@ class ModbusReader(threading.Thread):
         while True:
             try:
                 
-                # if self.tflag:
-                #     self.t_modbus += 1
                 # Read the values of the specified registers from the UR10
                 reg_TCP_x = self.c.read_holding_registers(self.registers['TCP_x'])
                 reg_TCP_y = self.c.read_holding_registers(self.registers['TCP_y'])
