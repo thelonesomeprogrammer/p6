@@ -10,18 +10,20 @@ import time
 import snap7
 
 class collector():
-    def __init__(self):
+    def __init__(self, client=None, c=None):
         self.running = True
 
+        self.today = datetime.today().strftime('%d%m%Y')
+
         ## PLC connection
-        self.client = snap7.client.Client()
+        self.client = client if client else snap7.client.Client()
         self.client.connect('172.20.1.148', 0, 1)
         self.db_number = 19
         self.start_offset = 0
         self.bit_offset = 0
 
         ## Modbus connection to UR10
-        self.c = ModbusClient(host='172.20.1.50', port=502, auto_open=True, debug=False)
+        self.c = c if c else ModbusClient(host='172.20.1.50', port=502, auto_open=True)
 
         self.flag = False
 
@@ -40,7 +42,7 @@ class collector():
 
         # Set up the variables for the PLC signal monitoring
         self.counter = 1
-        ext_dir = os.getcwd()+'\data'
+        ext_dir = os.getcwd()+'/data'
         self.directory = os.path.expanduser(ext_dir)
 
         self.data = []
@@ -68,7 +70,9 @@ class collector():
         while self.running:
             self.start_time_loop = time.time()
             reading = self.client.db_read(self.db_number, self.start_offset, 1)
+            print(reading)
             result = snap7.util.get_bool(reading, 0, self.bit_offset)
+            print(result)
 
             if result and not self.flag:
                 self.flag = True
@@ -82,8 +86,9 @@ class collector():
                 line = []
                 line.append(elapsed_time)
                 for reg in self.registers:
-                    line.append(reg[0])
+                    line.append(reg[0][0])
                 self.data.append(line)
+                print(line)
                 
                 # If the PLC signal is False or if the recording has reached its maximum duration, stop recording
                 if not result:
@@ -95,16 +100,13 @@ class collector():
                     df[['TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)']] /= 10
                     df[['TCP_rx(mm)', 'TCP_ry(mm)', 'TCP_rz(mm)', 'Robot_I(A)']] /= 1000
 
-                    filename_t = os.path.join(self.directory, f"data_{self.counter}")
+                    filename_t = os.path.join(self.directory, f"data_{self.today}_{self.counter}")
                     df.to_csv(filename_t+".csv", index=False)
 
 
     def stop(self):
         self.running = False
 
-w = collector()
-Thread(target=w.run).start()
-Thread(target=w.plc_run).start()
 
 
 # create flask app
@@ -122,6 +124,9 @@ def get_data():
 
 ## Main funcion, only initiate the Flask app
 def main(args=None):
+    w = collector()
+    Thread(target=w.run).start()
+    Thread(target=w.plc_run).start()
     atexit.register(w.stop) # call the function to close things properly when the server is down
     app.run(host='0.0.0.0', port=5000, debug=False)
 

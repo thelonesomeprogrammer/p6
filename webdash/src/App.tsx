@@ -4,15 +4,15 @@ import "./App.css";
 const App = () => {
 	const [status, setStatus] = useState<string>("Loading...");
 
-	useEffect(() => {
-		fetch("/api/health")
-			.then((res) => res.json())
-			.then((data) => setStatus(data.message))
-			.catch((err) => {
-				console.error("Error fetching health status:", err);
-				setStatus("Error connecting to backend");
-			});
-	}, []);
+	// useEffect(() => {
+	// 	fetch("/api/health")
+	// 		.then((res) => res.json())
+	// 		.then((data) => setStatus(data.message))
+	// 		.catch((err) => {
+	// 			console.error("Error fetching health status:", err);
+	// 			setStatus("Error connecting to backend");
+	// 		});
+	// }, []);
 
 	return (
 		<div className="content">

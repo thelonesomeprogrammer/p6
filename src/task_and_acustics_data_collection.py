@@ -4,8 +4,6 @@ from pyModbusTCP.client import ModbusClient
 import os
 import time
 import snap7
-from snap7.types import *
-from snap7.util import *
 import threading
 
 #wood = input("Enter wood number: ")
@@ -48,7 +46,7 @@ class ModbusReader(threading.Thread):
     def __init__(self, host, port, registers):
         threading.Thread.__init__(self)
         self.daemon = True
-        self.c = ModbusClient(host=host, port=port, auto_open=True, debug=False)
+        self.c = ModbusClient(host=host, port=port, auto_open=True)
         self.registers = registers
         self.register_values = {}
 
@@ -97,7 +95,7 @@ class ModbusReader(threading.Thread):
 
 # Connect to Modbus
 try:
-    c = ModbusClient(host='172.20.1.50', port=502, auto_open=True, debug=False)
+    c = ModbusClient(host='172.20.1.50', port=502, auto_open=True)
     print("connected",c.open())
 except ValueError:
     print("Error with host or port params")
