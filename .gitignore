@@ -1,6 +1,7 @@
 /log
 /build
 /install
+/data
 
 # Ignore python cache files
 __pycache__/
