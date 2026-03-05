@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import Card from "./comp/Card";
 
 const App = () => {
 	const [status, setStatus] = useState<string>("Loading...");
@@ -15,11 +16,13 @@ const App = () => {
 	// }, []);
 
 	return (
-		<div className="content">
+		<Card>
 			<h1>Rsbuild with React</h1>
-			<p>Backend Status: <strong>{status}</strong></p>
+			<p>
+				Backend Status: <strong>{status}</strong>
+			</p>
 			<p>Start building amazing things with Rsbuild.</p>
-		</div>
+		</Card>
 	);
 };
 

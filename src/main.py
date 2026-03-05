@@ -96,7 +96,7 @@ class collector():
                     self.counter += 1
                     
                     df = pd.DataFrame(data=self.data, columns=self.cols)
-                    df = df.applymap(self.unsigned)
+                    df = df.map(self.unsigned)
                     df[['TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)']] /= 10
                     df[['TCP_rx(mm)', 'TCP_ry(mm)', 'TCP_rz(mm)', 'Robot_I(A)']] /= 1000
 
