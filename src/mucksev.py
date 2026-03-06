@@ -1,5 +1,9 @@
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 from threading import Thread
 import time
 import random
@@ -35,6 +39,12 @@ class MockCollector:
             
             self.data.append(line)
             
+            if socketio:
+                modbus_data = {}
+                for i in range(1, 8):
+                    modbus_data[self.cols[i]] = line[i]
+                socketio.emit('modbus_data', modbus_data)
+            
             # Keep only the last 100 points to prevent memory bloat, 
             # similar to how a real-time monitor might behave
             if len(self.data) > 100:
@@ -47,6 +57,7 @@ class MockCollector:
 
 app = Flask(__name__)
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Initialize the collector globally so routes can access it
 w = MockCollector()
@@ -59,6 +70,10 @@ def index():
 def get_data():
     return {"data": w.data}
 
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
 def main():
     # Start the mock data generation thread
     thread = Thread(target=w.run)
@@ -66,7 +81,7 @@ def main():
     thread.start()
     
     print("Starting mock server on http://0.0.0.0:5000")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
 
 if __name__ == '__main__':
     main()

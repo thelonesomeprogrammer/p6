@@ -1,5 +1,9 @@
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask
 from flask_cors import CORS
+from flask_socketio import SocketIO
 from threading import Thread
 import atexit
 import pandas as pd
@@ -28,13 +32,13 @@ class collector():
         self.flag = False
 
         self.registers = [
-                [0, 400],
-                [0, 401],
-                [0, 402],
-                [0, 403],
-                [0, 404],
-                [0, 405],
-                [0, 450]
+                [[0], 400],
+                [[0], 401],
+                [[0], 402],
+                [[0], 403],
+                [[0], 404],
+                [[0], 405],
+                [[0], 450]
                 ]
 
         self.cols = ['Time(ms)', 'TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)', 
@@ -61,18 +65,34 @@ class collector():
         while self.running:
             for reg in self.registers:
                 try:
-                    reg[0] = self.c.read_holding_registers(reg[1])
+                    val = self.c.read_holding_registers(reg[1])
+                    if val is not None:
+                        reg[0] = val
                 except Exception:
                     pass
+            
+            if socketio:
+                modbus_data = {}
+                for i, reg in enumerate(self.registers):
+                    val = self.unsigned(reg[0][0])
+                    
+                    if i < 3:
+                        val /= 10.0
+                    else:
+                        val /= 1000.0
+                    modbus_data[self.cols[i+1]] = val
+                socketio.emit('modbus_data', modbus_data)
+            
+            time.sleep(0.1) # Frequency of monitoring
 
 
     def run(self):
         while self.running:
             self.start_time_loop = time.time()
             reading = self.client.db_read(self.db_number, self.start_offset, 1)
-            print(reading)
+            # print(reading)
             result = snap7.util.get_bool(reading, 0, self.bit_offset)
-            print(result)
+            # print(result)
 
             if result and not self.flag:
                 self.flag = True
@@ -88,7 +108,7 @@ class collector():
                 for reg in self.registers:
                     line.append(reg[0][0])
                 self.data.append(line)
-                print(line)
+                # print(line)
                 
                 # If the PLC signal is False or if the recording has reached its maximum duration, stop recording
                 if not result:
@@ -102,16 +122,20 @@ class collector():
 
                     filename_t = os.path.join(self.directory, f"data_{self.today}_{self.counter}")
                     df.to_csv(filename_t+".csv", index=False)
+            
+            time.sleep(0.01)
 
 
     def stop(self):
         self.running = False
 
 
-
 # create flask app
 app = Flask(__name__)
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+w = collector()
 
 # main flask page
 @app.route('/')
@@ -122,13 +146,16 @@ def index():
 def get_data():
     return {"data": w.data}
 
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
 ## Main funcion, only initiate the Flask app
 def main(args=None):
-    w = collector()
     Thread(target=w.run).start()
     Thread(target=w.plc_run).start()
     atexit.register(w.stop) # call the function to close things properly when the server is down
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
 
 if __name__ == '__main__':
     main()

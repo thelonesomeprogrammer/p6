@@ -6,7 +6,10 @@ export default defineConfig({
 	plugins: [pluginReact()],
 	server: {
 		proxy: {
-			"/api": "http://127.0.0.1:5000",
+			"/api": {
+				target: "http://127.0.0.1:5000",
+				pathRewrite: { "^/api": "" },
+			},
 		},
 	},
 });
