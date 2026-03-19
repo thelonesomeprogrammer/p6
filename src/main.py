@@ -1,18 +1,26 @@
-import eventlet
 from flask import Flask
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from threading import Thread
-import atexit
 import pandas as pd
 from datetime import datetime
 from pyModbusTCP.client import ModbusClient
 import os
 import time
 import snap7
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+import xml.etree.ElementTree as ET
 
 
-eventlet.monkey_patch()
+class KXMLHandler(FileSystemEventHandler):
+    def __init__(self, collector):
+        self.collector = collector
+
+    def on_created(self, event):
+        if event.src_path.endswith('.kxml'):
+            self.collector.kxml_ingest(event.src_path)
+
 
 class collector():
     def __init__(self, client=None, c=None):
@@ -45,6 +53,14 @@ class collector():
         self.cols = ['Time(ms)', 'TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)', 
                      'TCP_rx(mm)', 'TCP_ry(mm)', 'TCP_rz(mm)', 'Robot_I(A)']
 
+        self.kxml_handler = KXMLHandler(self)
+        self.observer = Observer()
+        self.observer.schedule(self.kxml_handler, path=os.getcwd(), recursive=False)
+        self.observer.start()
+
+        self.kxml_data = []
+        self.kxml_cols = ['Time(ms)', 'Nset(1/min)', 'Torque(Nm)', 'Current(V)', 'Angle(°)', 'Depth(mm)']
+
         # Set up the variables for the PLC signal monitoring
         self.counter = 1
         ext_dir = os.getcwd()+'/data'
@@ -66,7 +82,7 @@ class collector():
         while self.running:
             for reg in self.registers:
                 try:
-                    val = self.c.read_holding_registers(reg[1])
+                    val = self.c.read_holding_registers(reg[1])[0]
                     if val is not None:
                         reg[0] = val
                 except Exception:
@@ -75,7 +91,7 @@ class collector():
             if socketio:
                 modbus_data = {}
                 for i, reg in enumerate(self.registers):
-                    val = self.unsigned(reg[0][0])
+                    val = self.unsigned(reg[0])
                     
                     if i < 3:
                         val /= 10.0
@@ -120,15 +136,26 @@ class collector():
                     df = df.map(self.unsigned)
                     df[['TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)']] /= 10
                     df[['TCP_rx(mm)', 'TCP_ry(mm)', 'TCP_rz(mm)', 'Robot_I(A)']] /= 1000
-
+ 
                     filename_t = os.path.join(self.directory, f"data_{self.today}_{self.counter}")
                     df.to_csv(filename_t+".csv", index=False)
-            
-            time.sleep(0.01)
 
+    def kxml_ingest(self, file_path):
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+        
+        # 1. Extract X-Axis
+        x_axis = root.find(".//X_Axis")
+        if x_axis is not None:
+            values = [float(v.text) for v in x_axis.findall("Values/float")]
+            self.kxml_data.append(values)
 
-    def stop(self):
-        self.running = False
+        # 2. Extract all Y-Axes
+        y_axes = root.findall(".//Y_AxesList/AxisData")
+        for axis in y_axes:
+            values = [float(v.text) for v in axis.findall("Values/float")]
+            self.kxml_data.append(values)
+
 
 
 # create flask app
@@ -136,7 +163,8 @@ app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-w = collector()
+# Placeholder for the collector
+w = None
 
 # main flask page
 @app.route('/')
@@ -145,7 +173,15 @@ def index():
 
 @app.route('/data')
 def get_data():
-    return {"data": w.data}
+    if w:
+        return {"data": w.data}
+    return {"data": []}
+
+@app.route('/kxml_data')
+def get_kxml_data():
+    if w:
+        return {"kxml_data": w.kxml_data}
+    return {"kxml_data": []}
 
 @socketio.on('connect')
 def handle_connect():
@@ -153,10 +189,21 @@ def handle_connect():
 
 ## Main funcion, only initiate the Flask app
 def main(args=None):
+    global w
+    w = collector()
     Thread(target=w.run).start()
     Thread(target=w.plc_run).start()
-    atexit.register(w.stop) # call the function to close things properly when the server is down
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+
+def fake_main(args=None):
+    global w
+    import fake_collector
+    w = fake_collector.FakeCollector(socketio=socketio)
+    Thread(target=w.run).start()
+    Thread(target=w.plc_run).start()
+    print("Running in FAKE mode with precollected data")
     socketio.run(app, host='0.0.0.0', port=5000, debug=False)
 
 if __name__ == '__main__':
-    main()
+    # Change to main() to use real hardware
+    fake_main()
