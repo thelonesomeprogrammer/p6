@@ -1,6 +1,4 @@
 import eventlet
-eventlet.monkey_patch()
-
 from flask import Flask
 from flask_cors import CORS
 from flask_socketio import SocketIO
@@ -12,6 +10,9 @@ from pyModbusTCP.client import ModbusClient
 import os
 import time
 import snap7
+
+
+eventlet.monkey_patch()
 
 class collector():
     def __init__(self, client=None, c=None):
