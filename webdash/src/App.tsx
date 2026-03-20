@@ -1,12 +1,13 @@
 import RobotMonitor from "./comp/RobotMonitor";
+import ColectorCard from "./comp/ColectorCard";
 import "./App.css";
-
 
 const App = () => {
 	return (
-		<div className="p-8 space-y-4 flex">
+		<main className="flex">
 			<RobotMonitor />
-		</div>
+			<ColectorCard />
+		</main>
 	);
 };
 

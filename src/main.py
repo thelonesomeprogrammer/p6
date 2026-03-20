@@ -105,18 +105,14 @@ class collector():
 
     def run(self):
         while self.running:
-            self.start_time_loop = time.time()
             reading = self.client.db_read(self.db_number, self.start_offset, 1)
-            # print(reading)
             result = snap7.util.get_bool(reading, 0, self.bit_offset)
-            # print(result)
 
             if result and not self.flag:
                 self.flag = True
                 start_time = datetime.now()
                 self.data = []
             
-            # If the flag is True, record audio until the PLC signal goes back to False
             if self.flag:
                 current_time = datetime.now()
                 elapsed_time = (current_time - start_time).total_seconds() * 1000
@@ -130,15 +126,7 @@ class collector():
                 # If the PLC signal is False or if the recording has reached its maximum duration, stop recording
                 if not result:
                     self.flag = False
-                    self.counter += 1
                     
-                    df = pd.DataFrame(data=self.data, columns=self.cols)
-                    df = df.map(self.unsigned)
-                    df[['TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)']] /= 10
-                    df[['TCP_rx(mm)', 'TCP_ry(mm)', 'TCP_rz(mm)', 'Robot_I(A)']] /= 1000
- 
-                    filename_t = os.path.join(self.directory, f"data_{self.today}_{self.counter}")
-                    df.to_csv(filename_t+".csv", index=False)
 
     def kxml_ingest(self, file_path):
         tree = ET.parse(file_path)
@@ -155,6 +143,20 @@ class collector():
         for axis in y_axes:
             values = [float(v.text) for v in axis.findall("Values/float")]
             self.kxml_data.append(values)
+
+    def save_data(self, classification):
+        self.counter += 1
+        df = pd.DataFrame(data=self.data, columns=self.cols)
+        df = df.map(self.unsigned)
+        df[['TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)']] /= 10
+        df[['TCP_rx(mm)', 'TCP_ry(mm)', 'TCP_rz(mm)', 'Robot_I(A)']] /= 1000
+ 
+        filename_t = os.path.join(self.directory, f"data_{self.today}_{self.counter}_{classification}_robot")
+        df.to_csv(filename_t+".csv", index=False)
+
+        df_kxml = pd.DataFrame(data=self.kxml_data, columns=self.kxml_cols)
+        filename_kxml = os.path.join(self.directory, f"data_{self.today}_{self.counter}_{classification}_kxml")
+        df_kxml.to_csv(filename_kxml+".csv", index=False)
 
 
 
@@ -186,6 +188,37 @@ def get_kxml_data():
 @socketio.on('connect')
 def handle_connect():
     print('Client connected')
+
+@app.route('/save/<classification>', methods=['POST'])
+def save_data(classification):
+    if w:
+        w.save_data(classification)
+        return {"status": "success"}
+    return {"status": "error", "message": "Collector not initialized"}, 500
+
+@app.route('/set/counter/<int:counter>', methods=['POST'])
+def set_counter(counter):
+    if w:
+        w.counter = counter
+        return {"status": "success", "counter": w.counter}
+    return {"status": "error", "message": "Collector not initialized"}, 500
+
+@app.route('/set/directory/<path:directory>', methods=['POST'])
+def set_directory(directory):
+    if w:
+        w.directory = directory
+        return {"status": "success", "directory": w.directory}
+    return {"status": "error", "message": "Collector not initialized"}, 500
+
+@app.route('/get/param', methods=['GET'])
+def get_param():
+    if w:
+        return {
+            "counter": w.counter,
+            "directory": w.directory,
+        }
+    return {"status": "error", "message": "Collector not initialized"}, 500
+
 
 ## Main funcion, only initiate the Flask app
 def main(args=None):

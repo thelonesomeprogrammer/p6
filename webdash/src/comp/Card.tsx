@@ -2,17 +2,12 @@ import React, { ReactNode } from "react";
 
 interface CardProps {
 	children: ReactNode;
-	title?: string;
+	className?: string;
 }
 
-const Card: React.FC<CardProps> = ({ children, title }) => {
+const Card: React.FC<CardProps> = ({ children, className }) => {
 	return (
-		<div className="card">
-			{title && (
-				<div className="card-header">
-					<h3 className="card-title">{title}</h3>
-				</div>
-			)}
+		<div className={`card ${className || ""}`}>
 			<div className="card-content">{children}</div>
 		</div>
 	);

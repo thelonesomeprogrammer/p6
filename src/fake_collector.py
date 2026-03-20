@@ -5,6 +5,8 @@ import xml.etree.ElementTree as ET
 
 class FakeCollector:
     def __init__(self, socketio=None):
+        self.counter = 0
+        self.directory = "/data"
         self.running = True
         self.socketio = socketio
         self.data = []
