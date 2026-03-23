@@ -1,4 +1,4 @@
-import { expect, test, beforeAll, afterAll } from "@rstest/core";
+import { afterAll, beforeAll, expect, test } from "@rstest/core";
 import { render, screen, waitFor } from "@testing-library/react";
 import App from "../src/App";
 
