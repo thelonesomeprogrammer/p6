@@ -2,24 +2,46 @@ import os
 import pandas as pd
 import time
 import xml.etree.ElementTree as ET
+from datetime import datetime
 
 class FakeCollector:
     def __init__(self, socketio=None):
-        self.counter = 0
-        self.directory = "/data"
         self.running = True
         self.socketio = socketio
-        self.data = []
-        self.kxml_data = []
+        
+        self.today = datetime.today().strftime('%d%m%Y')
+        self.flag = False
+        
+        # registers: [current_val, address] - matching main.py's collector
+        self.registers = [
+            [0, 400], [0, 401], [0, 402], [0, 403], 
+            [0, 404], [0, 405], [0, 450]
+        ]
+        
         self.cols = ['Time(ms)', 'TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)', 
                      'TCP_rx(mm)', 'TCP_ry(mm)', 'TCP_rz(mm)', 'Robot_I(A)']
         
-        self.data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+        self.kxml_data = []
+        self.kxml_cols = ['Time(ms)', 'Nset(1/min)', 'Torque(Nm)', 'Current(V)', 'Angle(°)', 'Depth(mm)']
+        
+        self.counter = 1
+        # Use current working directory's data folder to match main.py
+        ext_dir = os.path.join(os.getcwd(), 'data')
+        self.directory = os.path.expanduser(ext_dir)
+        
+        self.data = []
+        
+        # Faker specific: discover available data sets for simulation
+        self.data_dir = self.directory
         self.file_sets = self._discover_file_sets()
         self.current_set_index = 0
 
     def _discover_file_sets(self):
         """Discovers matching pairs of .csv and .KXML files."""
+        if not os.path.exists(self.data_dir):
+            print(f"FakeCollector: Data directory {self.data_dir} not found.")
+            return []
+            
         csv_files = [f for f in os.listdir(self.data_dir) if f.startswith('data_') and f.endswith('.csv')]
         sets = []
         for csv_f in csv_files:
@@ -38,11 +60,19 @@ class FakeCollector:
                 continue
         return sorted(sets, key=lambda x: x['csv'])
 
+    def unsigned(self, a):
+        """Magic conversion function matching main.py."""
+        if a > 32767:
+            a = a - 65535
+        else:
+            a = a
+        return a
+
     def plc_run(self):
-        """Simulates the data emission and collection cycle."""
+        """Simulates Modbus data emission and cycle management."""
         while self.running:
             if not self.file_sets:
-                print("No matching file sets (CSV + KXML) found in data directory.")
+                print("FakeCollector: No matching file sets (CSV + KXML) found.")
                 time.sleep(5)
                 continue
 
@@ -50,85 +80,119 @@ class FakeCollector:
             csv_path = current_set['csv']
             kxml_path = current_set['kxml']
 
-            # 1. Reset data for the new cycle
-            print(f"Starting new cycle with set: {os.path.basename(csv_path)} and {os.path.basename(kxml_path)}")
-            self.data = []
-            self.kxml_data = []
-
-            # 2. Replay the CSV
-            print(f"Replaying {csv_path}")
+            print(f"FakeCollector: Starting cycle with {os.path.basename(csv_path)}")
+            
             try:
                 df = pd.read_csv(csv_path)
             except Exception as e:
-                print(f"Error reading CSV {csv_path}: {e}")
+                print(f"FakeCollector: Error reading {csv_path}: {e}")
                 self.current_set_index = (self.current_set_index + 1) % len(self.file_sets)
                 continue
+
+            # Reset data for the new recording cycle
+            self.data = []
+            self.kxml_data = []
+            self.flag = True
+            
+            if self.socketio:
+                self.socketio.emit('recording_status', {'status': 'started'})
+
+            start_time = datetime.now()
 
             for _, row in df.iterrows():
                 if not self.running:
                     break
                 
-                # Emit modbus data via socketio
+                # Update registers with "unscaled" values so save_data works correctly
+                # main.py scales: /10 for x,y,z and /1000 for rx,ry,rz,I
+                self.registers[0][0] = int(row['TCP_x(mm)'] * 10)
+                self.registers[1][0] = int(row['TCP_y(mm)'] * 10)
+                self.registers[2][0] = int(row['TCP_z(mm)'] * 10)
+                self.registers[3][0] = int(row['TCP_rx(mm)'] * 1000)
+                self.registers[4][0] = int(row['TCP_ry(mm)'] * 1000)
+                self.registers[5][0] = int(row['TCP_rz(mm)'] * 1000)
+                self.registers[6][0] = int(row['Robot_I(A)'] * 1000)
+
+                # Emit scaled modbus data via socketio (matching main.py's emission)
                 modbus_data = {col: row[col] for col in self.cols[1:]}
                 if self.socketio:
                     self.socketio.emit('modbus_data', modbus_data)
                 
-                # Record into self.data
-                self.data.append(row.tolist())
+                # Record into self.data (matching main.py's run loop behavior)
+                elapsed_ms = (datetime.now() - start_time).total_seconds() * 1000
+                line = [elapsed_ms] + [reg[0] for reg in self.registers]
+                self.data.append(line)
                 
-                # Fixed rate simulation (50ms as in previous version)
-                time.sleep(0.01) # Sped up slightly for better dev experience, but can be adjusted
+                # Simulation speed
+                time.sleep(0.01)
 
-            if not self.running:
-                break
+            self.flag = False
+            if self.socketio:
+                self.socketio.emit('recording_status', {'status': 'stopped'})
 
-            # 3. Read the KXML
-            print(f"Ingesting {kxml_path}")
+            # Ingest KXML after recording stops
             self.kxml_ingest(kxml_path)
 
-            # 4. Wait 2 seconds
-            print("Cycle finished. Waiting 2 seconds before next reset.")
+            print("FakeCollector: Cycle finished. Waiting 5 seconds.")
             time.sleep(5)
-
-            # Move to next set
             self.current_set_index = (self.current_set_index + 1) % len(self.file_sets)
 
     def run(self):
-        """Interface compatibility sleep loop."""
+        """Interface compatibility loop."""
         while self.running:
             time.sleep(1)
 
-    def stop(self):
-        self.running = False
-
     def kxml_ingest(self, file_path):
-        """Mimics the KXML ingestion from the real collector."""
+        """Mimics main.py's KXML ingestion."""
         try:
             tree = ET.parse(file_path)
             root = tree.getroot()
             
-            # Reset kxml_data before ingest as per 'reset and repeat'
-            # (Though plc_run already does it, we keep it consistent)
-            ingested_data = []
-
+            ingested_axes = []
             # 1. Extract X-Axis
             x_axis = root.find(".//X_Axis")
             if x_axis is not None:
                 values = [float(v.text) for v in x_axis.findall("Values/float")]
-                ingested_data.append(values)
+                ingested_axes.append(values)
 
             # 2. Extract all Y-Axes
             y_axes = root.findall(".//Y_AxesList/AxisData")
             for axis in y_axes:
                 values = [float(v.text) for v in axis.findall("Values/float")]
-                ingested_data.append(values)
+                ingested_axes.append(values)
             
-            self.kxml_data = ingested_data
-            print(f"Successfully ingested {len(ingested_data)} axes from KXML.")
-            
-            # Emit event that kxml is ready if needed (optional, but good for UX)
+            self.kxml_data = ingested_axes
+            print(f"FakeCollector: Ingested {len(ingested_axes)} axes from KXML.")
             if self.socketio:
-                self.socketio.emit('kxml_ready', {'file': os.path.basename(file_path)})
-
+                self.socketio.emit('kxml_ready')
         except Exception as e:
-            print(f"Error ingesting KXML {file_path}: {e}")
+            print(f"FakeCollector: Error ingesting KXML {file_path}: {e}")
+
+        self.socketio.emit('runFinished', {'status': 'complete'})
+
+    def save_data(self, classification):
+        """Mimics main.py's save_data exactly, including the likely column bug."""
+        self.counter += 1
+        df = pd.DataFrame(data=self.data, columns=self.cols)
+        df = df.map(self.unsigned)
+        df[['TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)']] /= 10
+        df[['TCP_rx(mm)', 'TCP_ry(mm)', 'TCP_rz(mm)', 'Robot_I(A)']] /= 1000
+ 
+        filename_t = os.path.join(self.directory, f"data_{self.today}_{self.counter}_{classification}_robot")
+        df.to_csv(filename_t+".csv", index=False)
+
+        # We use zip(*data) to fix the likely bug where axes are appended as columns but saved as rows
+        try:
+            if len(self.kxml_data) == len(self.kxml_cols):
+                df_kxml = pd.DataFrame(data=list(zip(*self.kxml_data)), columns=self.kxml_cols)
+            else:
+                df_kxml = pd.DataFrame(data=self.kxml_data, columns=self.kxml_cols)
+        except Exception:
+            df_kxml = pd.DataFrame(data=self.kxml_data)
+
+        filename_kxml = os.path.join(self.directory, f"data_{self.today}_{self.counter}_{classification}_kxml")
+        df_kxml.to_csv(filename_kxml+".csv", index=False)
+        print(f"FakeCollector: Data saved for {classification}")
+
+    def stop(self):
+        self.running = False
