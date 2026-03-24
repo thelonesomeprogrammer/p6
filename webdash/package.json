@@ -22,6 +22,7 @@
 		"@biomejs/biome": "2.3.8",
 		"@rsbuild/core": "^1.7.1",
 		"@rsbuild/plugin-react": "^1.4.2",
+		"@rsbuild/plugin-sass": "^1.5.1",
 		"@rstest/core": "^0.7.8",
 		"@tailwindcss/postcss": "^4.1.18",
 		"@testing-library/dom": "^10.4.1",

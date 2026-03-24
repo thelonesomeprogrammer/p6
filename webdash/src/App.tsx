@@ -2,7 +2,7 @@ import ColectorCard from "./comp/ColectorCard";
 import KXMLPlotter from "./comp/KXMLPlotter";
 import RobotPlotter from "./comp/RobotPlotter";
 import RobotMonitor from "./comp/RobotMonitor";
-import "./App.css";
+import "./App.scss";
 
 const App = () => {
 	return (
