@@ -25,11 +25,13 @@ class FakeCollector:
         self.kxml_cols = ['Time(ms)', 'Nset(1/min)', 'Torque(Nm)', 'Current(V)', 'Angle(°)', 'Depth(mm)']
         
         self.counter = 1
-        # Use current working directory's data folder to match main.py
-        ext_dir = os.path.join(os.getcwd(), 'data')
-        self.directory = os.path.expanduser(ext_dir)
+        self.directory = 'data/'
+        if not os.path.exists(self.directory):
+            os.makedirs(self.directory, exist_ok=True)
         
         self.data = []
+        self.old_datasets = []
+        self.collect = False
         
         # Faker specific: discover available data sets for simulation
         self.data_dir = self.directory
@@ -163,6 +165,11 @@ class FakeCollector:
             
             self.kxml_data = ingested_axes
             print(f"FakeCollector: Ingested {len(ingested_axes)} axes from KXML.")
+            if self.collect:
+                # Need to copy data to avoid reference issues
+                self.old_datasets.append([ingested_axes, list(self.data)])
+                if self.socketio:
+                    self.socketio.emit('collection_updated', {'count': len(self.old_datasets), 'collect': self.collect})
             if self.socketio:
                 self.socketio.emit('kxml_ready')
         except Exception as e:
@@ -193,6 +200,31 @@ class FakeCollector:
         filename_kxml = os.path.join(self.directory, f"data_{self.today}_{self.counter}_{classification}_kxml")
         df_kxml.to_csv(filename_kxml+".csv", index=False)
         print(f"FakeCollector: Data saved for {classification}")
+
+    def save_all(self, classifications):
+        """Saves all datasets in old_datasets and clears the list."""
+        for i, dataset in enumerate(self.old_datasets):
+            kxml_data, modbus_data = dataset
+            # Use current classification or default to 'unknown'
+            classification = classifications[i] if i < len(classifications) else "unknown"
+            
+            df_kxml = pd.DataFrame(data=list(zip(*kxml_data)), columns=self.kxml_cols)
+            filename_kxml = os.path.join(self.directory, f"data_{self.today}_{self.counter + i}_{classification}_kxml")
+            df_kxml.to_csv(filename_kxml+".csv", index=False)
+
+            df_modbus = pd.DataFrame(data=modbus_data, columns=self.cols)
+            df_modbus = df_modbus.map(self.unsigned)
+            df_modbus[['TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)']] /= 10
+            df_modbus[['TCP_rx(mm)', 'TCP_ry(mm)', 'TCP_rz(mm)', 'Robot_I(A)']] /= 1000
+            filename_modbus = os.path.join(self.directory, f"data_{self.today}_{self.counter + i}_{classification}_robot")
+            df_modbus.to_csv(filename_modbus+".csv", index=False)
+            
+        self.counter += len(self.old_datasets)
+        self.old_datasets = []
+        print(f"FakeCollector: Saved {len(classifications)} datasets.")
+        if self.socketio:
+            self.socketio.emit('collection_updated', {'count': len(self.old_datasets), 'collect': self.collect})
+            self.socketio.emit('params_updated', {'counter': self.counter, 'directory': self.directory})
 
     def stop(self):
         self.running = False

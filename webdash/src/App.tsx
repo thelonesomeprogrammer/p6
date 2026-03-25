@@ -2,14 +2,14 @@ import ColectorCard from "./comp/ColectorCard";
 import KXMLPlotter from "./comp/KXMLPlotter";
 import RobotPlotter from "./comp/RobotPlotter";
 import RobotMonitor from "./comp/RobotMonitor";
-import "./App.css";
+import "./App.scss";
 
 const App = () => {
 	return (
-		<main className="gap-4 p-4">
-			<div className="flex">
-				<RobotMonitor />
-				<ColectorCard />
+		<main className="flex flex-col gap-4 p-4">
+			<div className="flex gap-4">
+				<RobotMonitor className="" />
+				<ColectorCard className="" />
 			</div>
 			<KXMLPlotter />
 			<RobotPlotter />
