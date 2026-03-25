@@ -25,9 +25,9 @@ class FakeCollector:
         self.kxml_cols = ['Time(ms)', 'Nset(1/min)', 'Torque(Nm)', 'Current(V)', 'Angle(°)', 'Depth(mm)']
         
         self.counter = 1
-        # Use current working directory's data folder to match main.py
-        ext_dir = os.path.join(os.getcwd(), 'data')
-        self.directory = os.path.expanduser(ext_dir)
+        self.directory = 'data/'
+        if not os.path.exists(self.directory):
+            os.makedirs(self.directory, exist_ok=True)
         
         self.data = []
         self.old_datasets = []
@@ -168,6 +168,8 @@ class FakeCollector:
             if self.collect:
                 # Need to copy data to avoid reference issues
                 self.old_datasets.append([ingested_axes, list(self.data)])
+                if self.socketio:
+                    self.socketio.emit('collection_updated', {'count': len(self.old_datasets), 'collect': self.collect})
             if self.socketio:
                 self.socketio.emit('kxml_ready')
         except Exception as e:
@@ -220,6 +222,9 @@ class FakeCollector:
         self.counter += len(self.old_datasets)
         self.old_datasets = []
         print(f"FakeCollector: Saved {len(classifications)} datasets.")
+        if self.socketio:
+            self.socketio.emit('collection_updated', {'count': len(self.old_datasets), 'collect': self.collect})
+            self.socketio.emit('params_updated', {'counter': self.counter, 'directory': self.directory})
 
     def stop(self):
         self.running = False

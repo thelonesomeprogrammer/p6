@@ -116,10 +116,9 @@ class collector():
         self.cols = ['Time(ms)', 'TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)', 
                      'TCP_rx(mm)', 'TCP_ry(mm)', 'TCP_rz(mm)', 'Robot_I(A)']
 
-        ext_dir = os.path.join(os.getcwd(), 'data')
-        self.directory = os.path.expanduser(ext_dir)
+        self.directory = 'data/'
         if not os.path.exists(self.directory):
-            os.makedirs(self.directory)
+            os.makedirs(self.directory, exist_ok=True)
 
         self.kxml_handler = KXMLHandler(self)
         self.observer = Observer()
@@ -222,6 +221,7 @@ class collector():
             if self.collect:
                 # Use last_finished_data to ensure we get the data from the run that just stopped
                 self.old_datasets.append([list(self.kxml_data), self.last_finished_data])
+                socketio.emit('collection_updated', {'count': len(self.old_datasets), 'collect': self.collect})
         except Exception as e:
             print(f"Error ingesting KXML {file_path}: {e}")
 
@@ -343,6 +343,7 @@ def handle_connect():
 def start_collection():
     if w:
         w.collect = True
+        socketio.emit('collection_updated', {'count': len(w.old_datasets), 'collect': w.collect})
         return {"status": "success", "message": "Data collection started"}
     return {"status": "error", "message": "Collector not initialized"}, 500
 
@@ -350,6 +351,7 @@ def start_collection():
 def stop_collection():
     if w:
         w.collect = False
+        socketio.emit('collection_updated', {'count': len(w.old_datasets), 'collect': w.collect})
         return {"status": "success", "message": "Data collection stopped"}
     return {"status": "error", "message": "Collector not initialized"}, 500
 
@@ -370,6 +372,7 @@ def save_all():
     if w:
         classifications = request.json.get('classifications', [])
         w.save_all(classifications)
+        socketio.emit('collection_updated', {'count': len(w.old_datasets), 'collect': w.collect})
         return {"status": "success"}
     return {"status": "error", "message": "Collector not initialized"}, 500
 
@@ -377,6 +380,7 @@ def save_all():
 def save_data(classification):
     if w:
         w.save_data(classification)
+        socketio.emit('params_updated', {'counter': w.counter, 'directory': w.directory})
         return {"status": "success"}
     return {"status": "error", "message": "Collector not initialized"}, 500
 
@@ -384,6 +388,7 @@ def save_data(classification):
 def set_counter(counter):
     if w:
         w.counter = counter
+        socketio.emit('params_updated', {'counter': w.counter, 'directory': w.directory})
         return {"status": "success", "counter": w.counter}
     return {"status": "error", "message": "Collector not initialized"}, 500
 
@@ -391,6 +396,7 @@ def set_counter(counter):
 def set_directory(directory):
     if w:
         w.directory = directory
+        socketio.emit('params_updated', {'counter': w.counter, 'directory': w.directory})
         return {"status": "success", "directory": w.directory}
     return {"status": "error", "message": "Collector not initialized"}, 500
 
