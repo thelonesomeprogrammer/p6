@@ -1,6 +1,6 @@
 import type React from "react";
-import { useEffect, useState } from "react";
-import { io } from "socket.io-client";
+import { useEffect, useState, useCallback } from "react";
+import { socket } from "../socket";
 import Card from "./Card";
 import Plot from "./Plot";
 import ExpandToggleButton from "./ExpandToggleButton";
@@ -9,27 +9,35 @@ const RobotPlotter: React.FC = () => {
 	const [data, setData] = useState<any[]>([]);
 	const [isOpen, setIsOpen] = useState<boolean>(true);
 
-	const fetchData = async () => {
+	const fetchData = useCallback(async (signal?: AbortSignal) => {
 		try {
-			const response = await fetch("http://localhost:5000/data?points=500");
+			const response = await fetch("http://localhost:5000/data?points=500", { signal });
 			const raw = await response.json();
 			setData(raw.data || []);
-		} catch (error) {
+		} catch (error: any) {
+			if (error.name === "AbortError") return;
 			console.error("Error fetching Robot data:", error);
 		}
-	};
+	}, []);
 
 	useEffect(() => {
-		const socket = io("http://localhost:5000");
-		socket.on("runFinished", () => {
+		const controller = new AbortController();
+		
+		// Initial fetch
+		fetchData(controller.signal);
+
+		const onRunFinished = () => {
 			console.log("Run finished event received, fetching data...");
-			fetchData();
-		});
+			fetchData(controller.signal);
+		};
+
+		socket.on("runFinished", onRunFinished);
 
 		return () => {
-			socket.disconnect();
+			socket.off("runFinished", onRunFinished);
+			controller.abort();
 		};
-	}, []);
+	}, [fetchData]);
 
 	return (
 		<Card className="flex flex-col">

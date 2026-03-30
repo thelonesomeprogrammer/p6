@@ -1,6 +1,6 @@
 import type React from "react";
-import { useEffect, useState } from "react";
-import { io } from "socket.io-client";
+import { useEffect, useState, useCallback } from "react";
+import { socket } from "../socket";
 import Card from "./Card";
 import ToggleSwitch from "./ToggleSwitch";
 import Select from "./Select";
@@ -17,17 +17,22 @@ const ColectorCard: React.FC<{ className?: string }> = ({ className = "" }) => {
 
 	const [status, setStatus] = useState<string | null>(null);
 
-	const notify = (msg: string) => {
+	const notify = useCallback((msg: string) => {
 		setStatus(msg);
-		setTimeout(() => setStatus(null), 3000);
-	};
+	}, []);
 
-	const fetchInitialData = async () => {
+	useEffect(() => {
+		if (!status) return;
+		const timer = setTimeout(() => setStatus(null), 3000);
+		return () => clearTimeout(timer);
+	}, [status]);
+
+	const fetchInitialData = useCallback(async (signal?: AbortSignal) => {
 		try {
 			const [paramRes, collectRes, countRes] = await Promise.all([
-				fetch("http://localhost:5000/get/param"),
-				fetch("http://localhost:5000/get_collect"),
-				fetch("http://localhost:5000/get_collection_count"),
+				fetch("http://localhost:5000/get/param", { signal }),
+				fetch("http://localhost:5000/get_collect", { signal }),
+				fetch("http://localhost:5000/get_collection_count", { signal }),
 			]);
 
 			const paramData = await paramRes.json();
@@ -38,30 +43,35 @@ const ColectorCard: React.FC<{ className?: string }> = ({ className = "" }) => {
 			if (paramData.directory !== undefined) setDirectory(paramData.directory);
 			setIsCollecting(collectData.collect);
 			setCollectionCount(countData.count);
-		} catch (error) {
+		} catch (error: any) {
+			if (error.name === "AbortError") return;
 			console.error("Error fetching initial data:", error);
 		}
-	};
+	}, []);
 
 	useEffect(() => {
-		fetchInitialData();
+		const controller = new AbortController();
+		fetchInitialData(controller.signal);
 
-		const socket = io("http://localhost:5000");
-
-		socket.on("params_updated", (data) => {
+		const onParamsUpdated = (data: any) => {
 			if (data.counter !== undefined) setCounter(data.counter);
 			if (data.directory !== undefined) setDirectory(data.directory);
-		});
+		};
 
-		socket.on("collection_updated", (data) => {
+		const onCollectionUpdated = (data: any) => {
 			if (data.collect !== undefined) setIsCollecting(data.collect);
 			if (data.count !== undefined) setCollectionCount(data.count);
-		});
+		};
+
+		socket.on("params_updated", onParamsUpdated);
+		socket.on("collection_updated", onCollectionUpdated);
 
 		return () => {
-			socket.disconnect();
+			socket.off("params_updated", onParamsUpdated);
+			socket.off("collection_updated", onCollectionUpdated);
+			controller.abort();
 		};
-	}, []);
+	}, [fetchInitialData]);
 
 	useEffect(() => {
 		if (collectionCount > multiClassifications.length) {
@@ -72,7 +82,7 @@ const ColectorCard: React.FC<{ className?: string }> = ({ className = "" }) => {
 				),
 			]);
 		}
-	}, [collectionCount, classification]);
+	}, [collectionCount, classification, multiClassifications]);
 
 	const handleAction = async (url: string, body?: object) => {
 		try {
