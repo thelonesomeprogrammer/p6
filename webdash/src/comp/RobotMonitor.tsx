@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { io } from "socket.io-client";
+import { socket } from "../socket";
 import Card from "./Card";
 
 interface RobotData {
@@ -32,19 +32,26 @@ function RobotMonitor({ className = "" }: { className?: string }) {
 		"TCP_rz(mm)": null,
 		"Robot_I(A)": null,
 	});
-	const [connected, setConnected] = useState(false);
+	const [connected, setConnected] = useState(socket.connected);
 
 	useEffect(() => {
-		const socket = io("http://localhost:5000");
-		socket.on("connect", () => setConnected(true));
-		socket.on("disconnect", () => setConnected(false));
-		socket.on("modbus_data", (data: Partial<RobotData>) => {
+		const onConnect = () => setConnected(true);
+		const onDisconnect = () => setConnected(false);
+		const onModbusData = (data: Partial<RobotData>) => {
 			setModbusData((prev) => ({ ...prev, ...data }));
-		});
+		};
+
+		socket.on("connect", onConnect);
+		socket.on("disconnect", onDisconnect);
+		socket.on("modbus_data", onModbusData);
+
 		return () => {
-			socket.disconnect();
+			socket.off("connect", onConnect);
+			socket.off("disconnect", onDisconnect);
+			socket.off("modbus_data", onModbusData);
 		};
 	}, []);
+
 
 	return (
 		<Card className={`flex flex-col ${className}`}>

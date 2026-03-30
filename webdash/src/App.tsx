@@ -1,4 +1,6 @@
 import ColectorCard from "./comp/ColectorCard";
+import PredictorCard from "./comp/PredictorCard";
+import ScrewCard from "./comp/ScrewCard";
 import KXMLPlotter from "./comp/KXMLPlotter";
 import RobotPlotter from "./comp/RobotPlotter";
 import RobotMonitor from "./comp/RobotMonitor";
@@ -10,6 +12,8 @@ const App = () => {
 			<div className="flex gap-4">
 				<RobotMonitor className="" />
 				<ColectorCard className="" />
+				<PredictorCard className="" />
+				<ScrewCard className="" />
 			</div>
 			<KXMLPlotter />
 			<RobotPlotter />
