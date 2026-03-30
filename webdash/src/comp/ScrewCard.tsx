@@ -90,52 +90,54 @@ const ScrewCard: React.FC<{ className?: string }> = ({ className = "" }) => {
                 </div>
 
                 {/* Screw */}
-                {hasFinalClass ? (
-                    <div 
-                        className="absolute left-1/2 w-8"
-                        style={{ 
-                            top: '50%', // Aligned with the wood surface
-                            height: '120px',
-                            // percentIn = 0 => translateY(-120px) => tip is at surface
-                            // percentIn = 100 => translateY(-10px) => head is at surface
-                            // Travel distance = 110px
-                            transform: `translateX(-50%) translateY(${-120 + (percentIn * 1.1)}px)`,
-                            transition: 'transform 2.5s cubic-bezier(0.45, 0.05, 0.55, 0.95)',
-                            zIndex: 10
-                        }}
-                    >
-                        {/* Screw Head (10px height) */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-3 bg-gradient-to-r from-gray-400 via-gray-100 to-gray-400 rounded-t-sm border border-gray-500 shadow-sm">
-                            {/* Driver slot simulation */}
-                            <div 
-                                className="absolute top-1/2 left-1/2 -translate-y-1/2 h-2 bg-gray-600/40 rounded-full" 
-                                style={{ 
-                                    width: `${Math.abs(Math.cos(percentIn * 0.1)) * 10 + 2}px`,
-                                    left: '50%',
-                                    transform: 'translateX(-50%)'
-                                }}
-                            />
-                        </div>
-
-                        {/* Screw Neck (5px) */}
-                        <div className="absolute top-[3px] left-1/2 -translate-x-1/2 w-5 h-2 bg-gray-400 border-x border-gray-500" />
-
-                        {/* Screw Body (90px height) */}
-                        <div className="absolute top-[5px] left-1/2 -translate-x-1/2 w-4 h-[100px] bg-gradient-to-r from-gray-400 via-gray-300 to-gray-400 border-x border-gray-500 overflow-hidden">
-                             {/* Threads - Animating background position simulates rotation */}
-                             <div className="absolute inset-0 opacity-40" 
-                                  style={{ 
-                                      backgroundImage: 'repeating-linear-gradient(-20deg, transparent, transparent 5px, #444 5px, #444 8px)',
-                                      backgroundPosition: `0 ${percentIn * 3}px`,
-                                      transition: 'background-position 2.5s cubic-bezier(0.45, 0.05, 0.55, 0.95)'
-                                  }} />
-                        </div>
-
-                        {/* Screw Point (15px) */}
-                        <div className="absolute top-[105px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[15px] border-t-gray-400" />
+                <div 
+                    className="absolute left-1/2 w-8"
+                    style={{ 
+                        top: '50%', // Aligned with the wood surface
+                        height: '120px',
+                        // percentIn = 0 => translateY(-120px) => tip is at surface
+                        // percentIn = 100 => translateY(-10px) => head is at surface
+                        // Travel distance = 110px
+                        transform: `translateX(-50%) translateY(${-120 + (percentIn * 1.1)}px)`,
+                        transition: 'transform 2.5s cubic-bezier(0.45, 0.05, 0.55, 0.95), opacity 0.5s ease-in-out',
+                        zIndex: 10,
+                        opacity: (hasFinalClass && prediction.prediction !== 'M') ? 1 : 0,
+                        pointerEvents: hasFinalClass ? 'auto' : 'none'
+                    }}
+                >
+                    {/* Screw Head (10px height) */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-3 bg-gradient-to-r from-gray-400 via-gray-100 to-gray-400 rounded-t-sm border border-gray-500 shadow-sm">
+                        {/* Driver slot simulation */}
+                        <div 
+                            className="absolute top-1/2 left-1/2 -translate-y-1/2 h-2 bg-gray-600/40 rounded-full" 
+                            style={{ 
+                                width: `${Math.abs(Math.cos(percentIn * 0.1)) * 10 + 2}px`,
+                                left: '50%',
+                                transform: 'translateX(-50%)'
+                            }}
+                        />
                     </div>
-                ) : (
-                    <div className="text-xs text-gray-400 italic font-medium uppercase tracking-wider">Awaiting classification</div>
+
+                    {/* Screw Neck (5px) */}
+                    <div className="absolute top-[3px] left-1/2 -translate-x-1/2 w-5 h-2 bg-gray-400 border-x border-gray-500" />
+
+                    {/* Screw Body (90px height) */}
+                    <div className="absolute top-[5px] left-1/2 -translate-x-1/2 w-4 h-[100px] bg-gradient-to-r from-gray-400 via-gray-300 to-gray-400 border-x border-gray-500 overflow-hidden">
+                            {/* Threads - Animating background position simulates rotation */}
+                            <div className="absolute inset-0 opacity-40" 
+                                style={{ 
+                                    backgroundImage: 'repeating-linear-gradient(-20deg, transparent, transparent 5px, #444 5px, #444 8px)',
+                                    backgroundPosition: `0 ${percentIn * 3}px`,
+                                    transition: 'background-position 2.5s cubic-bezier(0.45, 0.05, 0.55, 0.95)'
+                                }} />
+                    </div>
+
+                    {/* Screw Point (15px) */}
+                    <div className="absolute top-[105px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[15px] border-t-gray-400" />
+                </div>
+
+                {!hasFinalClass && (
+                    <div className="text-xs text-gray-400 italic font-medium uppercase tracking-wider animate-pulse">Awaiting classification</div>
                 )}
                 
                 {error && (
