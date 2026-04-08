@@ -89,7 +89,7 @@ flowchart TD
 
     subgraph PC[PredictorCard]
         direction TB
-        PC1[Subscribe socket: runFinished] --> PC2[GET /predict_all?model=rf|gb]
+        PC1[Subscribe socket: runFinished] --> PC2[GET /predict_all?model=rf/gb]
         PC3[Run Prediction button] --> PC2
         PC2 --> PC4[Render table:\nwindow% / label / conf / remaining angle]
     end
