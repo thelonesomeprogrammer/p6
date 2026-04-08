@@ -118,69 +118,35 @@ flowchart TD
 
 ---
 
-## 3. Interface Flow (REST API + WebSocket)
+## 3. Interface Flow — Single Screw Run
 
 ```mermaid
 sequenceDiagram
-    participant HW_PLC as PLC (snap7)
-    participant HW_UR10 as UR10 Robot (Modbus)
-    participant HW_KXML as Screwdriver Tool (KXML files)
-    participant BE as Backend (Flask/SocketIO :5000)
-    participant FE as Frontend (React :3000)
+    participant PLC as PLC
+    participant Tool as Screwdriver Tool
+    participant BE as Backend
+    participant FE as Frontend
 
-    Note over BE: On startup
+    PLC->>BE: Signal HIGH (screw start)
+    BE-->>FE: recording_status {started}
+    Note over BE: Buffer robot data
 
-    BE->>HW_PLC: snap7.connect(172.20.1.148)
-    BE->>HW_UR10: ModbusClient.connect(172.20.1.50:502)
-    FE->>BE: socket.io connect
-
-    loop Every 100 ms (plc_run thread)
-        BE->>HW_UR10: read_holding_registers(400-405, 450)
-        HW_UR10-->>BE: raw register values
-        BE-->>FE: emit modbus_data {TCP_x, TCP_y, TCP_z, ...}
+    loop Screw in progress
+        BE->>BE: Append Modbus register values
     end
 
-    loop PLC signal monitoring (run thread)
-        BE->>HW_PLC: db_read(DB19, offset=0)
-        HW_PLC-->>BE: bit value
-        alt Signal goes HIGH
-            BE-->>FE: emit recording_status {status: started}
-            Note over BE: Begin buffering robot data
-        else Signal goes LOW (was recording)
-            BE-->>FE: emit recording_status {status: stopped}
-            Note over BE: Save last_finished_data
-        end
-    end
+    PLC->>BE: Signal LOW (screw done)
+    BE-->>FE: recording_status {stopped}
 
-    HW_KXML->>BE: New .KXML file written to data/
-    Note over BE: Watchdog detects file
+    Tool->>BE: .KXML file written to data/
     BE->>BE: Parse XML → store kxml_data
-    BE-->>FE: emit runFinished {status: complete}
-
-    alt Collection enabled
-        BE-->>FE: emit collection_updated {count, collect}
-    end
-
-    FE->>BE: GET /kxml_data?points=500
-    BE-->>FE: {kxml_data: [...]} (LTTB downsampled)
-
-    FE->>BE: GET /data?points=500
-    BE-->>FE: {data: [...]} (LTTB downsampled)
+    BE-->>FE: runFinished
 
     FE->>BE: GET /predict_all?model=rf
-    BE->>BE: Extract features at 25/50/75/100% windows
-    BE->>BE: Classify (RF/GB) + Regress remaining angle
-    BE-->>FE: {predictions: [{window_percent, prediction, probabilities, remaining_angle}]}
+    BE->>BE: Window features → RF classify + regress
+    BE-->>FE: predictions [{window%, label, remaining_angle}]
 
-    FE->>BE: POST /start_collection
-    BE-->>FE: emit collection_updated {collect: true}
-
-    FE->>BE: POST /save_all {classifications: [...]}
-    BE->>BE: Write CSVs to data/ directory
-    BE-->>FE: emit collection_updated {count: 0}
-
-    FE->>BE: POST /set/counter/N
-    BE-->>FE: emit params_updated {counter, directory}
+    FE->>FE: Animate screw depth\nShow predicted state
 ```
 
 ---
