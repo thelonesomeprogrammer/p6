@@ -131,7 +131,7 @@ const ColectorCard: React.FC<{ className?: string }> = ({ className = "" }) => {
 		<Card className={`flex flex-col ${className}`}>
 			<div className="flex justify-between items-center">
 				<h2 className="text-lg font-semibold text-gray-700">
-					Colector Control
+					Collector Control
 				</h2>
 				{/* Collection Toggle */}
 				<div className="flex items-center gap-2">
