@@ -185,7 +185,45 @@ sequenceDiagram
 
 ---
 
-## 4. Functional System Decomposition (Gomaa Chart)
+## 4. Functional System Decomposition — Simple (Gomaa Chart)
+
+```mermaid
+flowchart TD
+    SYS["<b>Screw Quality Monitoring System</b>"]
+
+    SYS --> ACQSYS[1. Data Acquisition]
+    SYS --> PROCSYS[2. Data Processing]
+    SYS --> MLINFSYS[3. ML Inference]
+    SYS --> STORESYS[4. Data Storage]
+    SYS --> VISSYS[5. Visualisation &amp; UI]
+
+    ACQSYS --> ACQ1[PLC Interface]
+    ACQSYS --> ACQ2[Robot Interface]
+    ACQSYS --> ACQ3[KXML File Watcher]
+
+    PROCSYS --> PROC1[Unit Scaling]
+    PROCSYS --> PROC2[LTTB Downsampling]
+    PROCSYS --> PROC3[Feature Extraction]
+    PROCSYS --> PROC4[Windowing]
+
+    MLINFSYS --> ML1[Classification\nRF / GB]
+    MLINFSYS --> ML2[Regression\nRemaining Angle]
+
+    STORESYS --> STORE1[In-memory Buffer]
+    STORESYS --> STORE2[Collected Datasets]
+    STORESYS --> STORE3[CSV Export]
+
+    VISSYS --> UI1[Robot Monitor]
+    VISSYS --> UI2[Collector Control]
+    VISSYS --> UI3[ML Predictor Panel]
+    VISSYS --> UI4[Screw Animation]
+    VISSYS --> UI5[KXML Plotter]
+    VISSYS --> UI6[Robot Plotter]
+```
+
+---
+
+## 5. Functional System Decomposition — Detailed (Gomaa Chart)
 
 ```mermaid
 flowchart TD
