@@ -128,7 +128,6 @@ sequenceDiagram
     participant FE as Frontend
 
     PLC->>BE: Signal HIGH (screw start)
-    Note over BE: Buffer robot data
 
     loop Screw in progress
         BE->>BE: Append Modbus register values
@@ -140,11 +139,14 @@ sequenceDiagram
     BE->>BE: Parse XML → store kxml_data
     BE-->>FE: runFinished
 
-    FE->>BE: GET /predict_all?model=rf
-    BE->>BE: Window features → RF classify + regress
-    BE-->>FE: predictions [{window%, label, remaining_angle}]
+    FE->>BE: GET /data
+    BE->>FE: Robot data for Graphs
 
-    FE->>FE: Animate screw depth\nShow predicted state
+    FE->>BE: GET /kxml_data
+    BE->>FE: screwdriver data for Graphs
+
+    FE->>BE: GET /predict_all?model=rf
+    BE->>FE: predictions [{window%, label, remaining_angle}]
 ```
 
 ---
