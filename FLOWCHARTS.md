@@ -128,7 +128,6 @@ sequenceDiagram
     participant FE as Frontend
 
     PLC->>BE: Signal HIGH (screw start)
-    BE-->>FE: recording_status {started}
     Note over BE: Buffer robot data
 
     loop Screw in progress
@@ -136,7 +135,6 @@ sequenceDiagram
     end
 
     PLC->>BE: Signal LOW (screw done)
-    BE-->>FE: recording_status {stopped}
 
     Tool->>BE: .KXML file written to data/
     BE->>BE: Parse XML → store kxml_data
