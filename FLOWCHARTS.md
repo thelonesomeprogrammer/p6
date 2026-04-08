@@ -81,7 +81,7 @@ flowchart TD
         direction TB
         CC1[Mount: fetch /get/param\n/get_collect\n/get_collection_count] --> CC2[Show counter\ndirectory\ncollection count]
         CC3[Subscribe socket:\nparams_updated\ncollection_updated] --> CC2
-        CC4[Toggle Switch] -- POST --> CC5[/start_collection\nor /stop_collection]
+        CC4[Toggle Switch] -- POST --> CC5["/start_collection<br/>or /stop_collection"]
         CC6[Counter input blur/Enter] -- POST --> CC7[/set/counter/N]
         CC8[Directory input blur/Enter] -- POST --> CC9[/set/directory/path]
         CC10[Save All button] -- POST /save_all\nwith classifications --> CC11[Clear buffer]
