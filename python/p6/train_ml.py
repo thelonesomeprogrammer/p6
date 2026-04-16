@@ -7,6 +7,8 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.preprocessing import StandardScaler
 
+from .extractor import ExpandingFeatureExtractor
+
 # Constants
 DATA_DIR = "prev-data/Dataset/Intrinsic data"
 FOLDERS_TO_LABELS = {
@@ -16,28 +18,7 @@ FOLDERS_TO_LABELS = {
     "NS": "M"
 }
 IGNORE_FOLDERS = ["P"]
-FEATURES = ["Torque (Nm)", "Current (V)", "Depth (mm)"]
-
-def extract_features(df):
-    """Extract statistical features from a window of data."""
-    stats = {}
-    for col in FEATURES:
-        series = df[col]
-        stats[f"{col}_mean"] = series.mean()
-        stats[f"{col}_std"] = series.std()
-        stats[f"{col}_max"] = series.max()
-        stats[f"{col}_min"] = series.min()
-        stats[f"{col}_last"] = series.iloc[-1]
-        stats[f"{col}_median"] = series.median()
-        # Simple slope estimate (first to last)
-        if len(series) > 1:
-            stats[f"{col}_slope"] = (series.iloc[-1] - series.iloc[0]) / len(series)
-        else:
-            stats[f"{col}_slope"] = 0
-            
-    # Add progress as a feature (optional, but might help with expanding window)
-    # However, since we want to predict 'at any time', maybe not.
-    return stats
+FEATURES = ["Torque (Nm)", "Current (V)"]
 
 def load_data():
     all_samples = []
@@ -61,14 +42,24 @@ def load_data():
                 if n_rows < 5:
                     continue
                 
+                # Each file gets its own extractor
+                extractor = ExpandingFeatureExtractor(
+                    features=["mean", "std", "max", "min", "last", "median", "slope"],
+                    columns=FEATURES
+                )
+                
                 # Each file gets its own list of windowed samples
                 file_samples = []
+                last_idx = 0
                 for percent in [0.2, 0.4, 0.6, 0.8, 1.0]:
                     idx = int(n_rows * percent)
-                    if idx < 2: continue
-                    window = df.iloc[:idx]
-                    features = extract_features(window)
+                    if idx - last_idx < 1:
+                        continue
+                        
+                    chunk = df.iloc[last_idx:idx]
+                    features = extractor.update(chunk)
                     file_samples.append(features)
+                    last_idx = idx
                 
                 all_samples.append({
                     "samples": file_samples,
@@ -138,8 +129,8 @@ def main():
             "labels": gb.classes_.tolist()
         }
     }
-    joblib.dump(models, "src/predictors_ml.joblib")
-    print("\nModels saved to src/predictors_ml.joblib")
+    joblib.dump(models, "p6/predictors_ml.joblib")
+    print("\nModels saved to p6/predictors_ml.joblib")
 
 if __name__ == "__main__":
     main()

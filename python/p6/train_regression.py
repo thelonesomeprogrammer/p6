@@ -8,27 +8,11 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import StandardScaler
 
+from .extractor import ExpandingFeatureExtractor
+
 # Constants
 DATA_DIR = "prev-data/Dataset/Intrinsic data/N"
-FEATURES = ["Torque (Nm)", "Current (V)", "Depth (mm)", "Angle (deg)"]
-
-def extract_features(df):
-    """Extract statistical features from a window of data."""
-    stats = {}
-    for col in FEATURES:
-        series = df[col]
-        stats[f"{col}_mean"] = series.mean()
-        stats[f"{col}_std"] = series.std()
-        stats[f"{col}_max"] = series.max()
-        stats[f"{col}_min"] = series.min()
-        stats[f"{col}_last"] = series.iloc[-1]
-        stats[f"{col}_median"] = series.median()
-        # Simple slope estimate (first to last)
-        if len(series) > 1:
-            stats[f"{col}_slope"] = (series.iloc[-1] - series.iloc[0]) / len(series)
-        else:
-            stats[f"{col}_slope"] = 0
-    return stats
+FEATURES = ["Torque (Nm)", "Current (V)"]
 
 def load_data():
     all_samples = []
@@ -54,14 +38,25 @@ def load_data():
             
             final_angle = df['Angle (deg)'].max()
             
+            # Each file gets its own extractor
+            extractor = ExpandingFeatureExtractor(
+                features=["mean", "std", "max", "min", "last", "median", "slope"],
+                columns=FEATURES
+            )
+            
             # Sample multiple windows from each file
             # We use more granular steps for regression to capture the approach
+            last_idx = 0
             for percent in np.linspace(0.1, 0.9, 10):
                 idx = int(n_rows * percent)
-                if idx < 2: continue
-                window = df.iloc[:idx]
-                features = extract_features(window)
-                current_angle = df.iloc[idx-1]['Angle (deg)']
+                if idx - last_idx < 1:
+                    continue
+                
+                chunk = df.iloc[last_idx:idx]
+                features = extractor.update(chunk)
+                
+                # Get the last angle from the extracted features
+                current_angle = features["Angle (deg)_last"]
                 remaining_angle = final_angle - current_angle
                 
                 all_samples.append({
@@ -69,6 +64,7 @@ def load_data():
                     "target": remaining_angle,
                     "file": file
                 })
+                last_idx = idx
                     
         except Exception as e:
             # print(f"Error reading {file_path}: {e}")
@@ -147,8 +143,8 @@ def main():
     }
     
     # Save the models
-    joblib.dump(results, "src/regressors_ml.joblib")
-    print("\nModels saved to src/regressors_ml.joblib")
+    joblib.dump(results, "p6/regressors_ml.joblib")
+    print("\nModels saved to p6/regressors_ml.joblib")
 
 if __name__ == "__main__":
     main()

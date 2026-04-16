@@ -1,26 +1,52 @@
 # p6 Project Structure
 
-A full-stack application with a Flask backend and a React (Rsbuild) frontend.
+A hybrid Rust + Python project using `uv` and `maturin`.
 
 ## Conceptual Overview
 
--   **Backend (`src/main.py`)**: A Flask-based API server that also runs background worker threads. It handles business logic, data processing (e.g., using `torch`), and serves JSON endpoints.
--   **Frontend (`webdash/`)**: A modern React application built with Rsbuild. It communicates with the backend via a development proxy for seamless API integration.
+-   **Backend (`python/p6/main.py`)**: A Flask-based API server.
+-   **Native Extension (`src/lib.rs`)**: High-performance Rust implementations (e.g., LTTB algorithm).
+-   **Frontend (`webdash/`)**: A modern React application built with Rsbuild.
 
-## Getting Started
+## Development Setup
 
 ### Prerequisites
 -   **Python 3.13+** (managed with `uv`)
+-   **Rust** (managed with `rustup`)
+-   **Zig** (for cross-compilation)
 -   **Node.js** (managed with `yarn`)
 
 ### Running the App
-1.  **Backend**: `uv run python src/main.py` (Starts on port 5000)
-2.  **Frontend**: `cd webdash && yarn dev` (Starts on port 3000)
+1.  **Backend (with Rust extension)**: 
+    ```bash
+    uv run python python/p6/main.py
+    ```
+    (Starts on port 5000. `maturin` handles the compilation of the Rust part automatically when using `uv`).
+
+2.  **Frontend**: 
+    ```bash
+    cd webdash && yarn dev
+    ```
+    (Starts on port 3000)
 
 ## Project Layout
 
--   `src/`: Backend Python source code.
--   `webdash/`: Frontend React application source and configuration.
--   `AGENTS.md`: Detailed instructions for AI-assisted development and commands.
--   `pyproject.toml`: Python dependencies and project metadata.
--   `webdash/package.json`: Frontend dependencies and build scripts.
+-   `src/`: Rust source code.
+-   `python/p6/`: Backend Python package.
+-   `webdash/`: Frontend React application.
+-   `Cargo.toml`: Rust package configuration.
+-   `pyproject.toml`: Python project configuration and `maturin` settings.
+
+## Cross-Compilation with Zig
+
+To cross-compile for different targets using Zig:
+
+1.  Install `cargo-zigbuild`:
+    ```bash
+    cargo install cargo-zigbuild
+    ```
+2.  Install Zig on your system.
+3.  Build with maturin:
+    ```bash
+    uvx maturin build --zig --target <target-triple>
+    ```

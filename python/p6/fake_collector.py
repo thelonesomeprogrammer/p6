@@ -65,7 +65,7 @@ class FakeCollector:
     def unsigned(self, a):
         """Magic conversion function matching main.py."""
         if a > 32767:
-            a = a - 65535
+            a = a - 65536
         else:
             a = a
         return a

@@ -1,0 +1,21 @@
+[package]
+name = "p6"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "_p6"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["extension-module"] }
+numpy = "0.23"
+# For math operations
+ndarray = "0.16"
+arrow = { version = "54", features = ["pyarrow"] }
+smallvec = "1.10"
+num-traits = "0.2"
+
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"

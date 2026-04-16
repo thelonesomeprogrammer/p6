@@ -25,6 +25,7 @@ class Collector():
         self.running = True
         self.old_datasets = []
         self.collect = False
+        self.socketio = socketio
 
         self.today = datetime.today().strftime('%d%m%Y')
 

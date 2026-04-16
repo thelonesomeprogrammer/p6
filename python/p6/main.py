@@ -4,9 +4,9 @@ from flask_socketio import SocketIO
 from threading import Thread
 import pandas as pd
 from flask import request
-from lttb import lttb_indices
-from collector import Collector
-from predictor import MLPredictor, RegressionPredictor
+from . import lttb_indices
+from .collector import Collector
+from .predictor import MLPredictor, RegressionPredictor, LSTMPredictor
 
 # create flask app
 app = Flask(__name__)
@@ -14,15 +14,16 @@ CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Initialize predictors
-# Default to Random Forest
 predictor_rf = None
 predictor_gb = None
 predictor_reg_rf = None
+predictor_lstm = None
 
 try:
     predictor_rf = MLPredictor(model_type="rf")
     predictor_gb = MLPredictor(model_type="gb")
     predictor_reg_rf = RegressionPredictor(model_type="rf_regressor")
+    predictor_lstm = LSTMPredictor()
 except Exception as e:
     print(f"Warning: ML Predictors not loaded: {e}")
 
@@ -52,6 +53,7 @@ def predict_kxml():
         col_names = w.kxml_cols[:num_cols] if len(w.kxml_cols) >= num_cols else [f"Col{i}" for i in range(num_cols)]
         df = pd.DataFrame(data=row_data, columns=col_names)
         
+        predictor.reset()
         result = predictor.predict(df)
         if result:
             return result
@@ -65,7 +67,13 @@ def predict_remaining():
     if not w or not w.kxml_data:
         return {"error": "No KXML data available"}, 400
     
-    if not predictor_reg_rf:
+    model_type = request.args.get('model', default='rf', type=str)
+    if model_type == 'lstm' and predictor_lstm:
+        predictor = predictor_lstm
+    else:
+        predictor = predictor_reg_rf
+
+    if not predictor:
         return {"error": "Regression Predictor not loaded"}, 500
 
     try:
@@ -75,7 +83,8 @@ def predict_remaining():
         col_names = w.kxml_cols[:num_cols] if len(w.kxml_cols) >= num_cols else [f"Col{i}" for i in range(num_cols)]
         df = pd.DataFrame(data=row_data, columns=col_names)
         
-        result = predictor_reg_rf.predict(df)
+        predictor.reset()
+        result = predictor.predict(df)
         if result:
             return result
         else:
@@ -104,20 +113,32 @@ def predict_all():
         n_rows = len(df)
         results = []
         
-        # 10 window stops: 25%, 50%, 75%, 100%
+        # Reset all predictors for a clean incremental run
+        predictor.reset()
+        if predictor_reg_rf: predictor_reg_rf.reset()
+        if predictor_lstm: predictor_lstm.reset()
+
+        # 4 window stops: 25%, 50%, 75%, 100%
         for i in range(1, 5):
             percent = i / 4
             idx = max(2, int(n_rows * percent))
             window = df.iloc[:idx]
+            
             res = predictor.predict(window)
             if res:
                 res["window_percent"] = int(percent * 100)
                 
                 # Add regression if available
-                if predictor_reg_rf:
+                # Use LSTM if requested, otherwise fallback to RF
+                if model_type == 'lstm' and predictor_lstm:
+                    reg_res = predictor_lstm.predict(window)
+                elif predictor_reg_rf:
                     reg_res = predictor_reg_rf.predict(window)
-                    if reg_res:
-                        res.update(reg_res)
+                else:
+                    reg_res = None
+
+                if reg_res:
+                    res.update(reg_res)
                         
                 results.append(res)
         
@@ -265,7 +286,7 @@ def main(args=None):
 
 def fake_main(args=None):
     global w
-    import fake_collector
+    from . import fake_collector
     w = fake_collector.FakeCollector(socketio=socketio)
     Thread(target=w.run).start()
     Thread(target=w.plc_run).start()
