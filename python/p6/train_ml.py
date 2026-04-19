@@ -7,7 +7,7 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.preprocessing import StandardScaler
 
-from .extractor import ExpandingFeatureExtractor
+from extractor import ExpandingFeatureExtractor
 
 # Constants
 DATA_DIR = "prev-data/Dataset/Intrinsic data"
@@ -43,15 +43,12 @@ def load_data():
                     continue
                 
                 # Each file gets its own extractor
-                extractor = ExpandingFeatureExtractor(
-                    features=["mean", "std", "max", "min", "last", "median", "slope"],
-                    columns=FEATURES
-                )
+                extractor = ExpandingFeatureExtractor()
                 
                 # Each file gets its own list of windowed samples
                 file_samples = []
                 last_idx = 0
-                for percent in [0.2, 0.4, 0.6, 0.8, 1.0]:
+                for percent in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
                     idx = int(n_rows * percent)
                     if idx - last_idx < 1:
                         continue
@@ -77,7 +74,6 @@ def main():
     data = load_data()
     
     # Split by file to prevent leakage
-    from sklearn.model_selection import train_test_split
     train_data, test_data = train_test_split(data, test_size=0.2, random_state=42, stratify=[d["label"] for d in data])
     
     def flatten_data(subset):
@@ -129,7 +125,7 @@ def main():
             "labels": gb.classes_.tolist()
         }
     }
-    joblib.dump(models, "p6/predictors_ml.joblib")
+    joblib.dump(models, "predictors_ml.joblib")
     print("\nModels saved to p6/predictors_ml.joblib")
 
 if __name__ == "__main__":

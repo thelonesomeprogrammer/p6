@@ -5,13 +5,13 @@ import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.preprocessing import StandardScaler
 
-from .extractor import ExpandingFeatureExtractor
+from extractor import ExpandingFeatureExtractor
 
 # Constants
-DATA_DIR = "prev-data/Dataset/Intrinsic data/N"
+DATA_DIR = "prev-data/Dataset/Intrinsic data/N/"
 FEATURES = ["Torque (Nm)", "Current (V)"]
 
 def load_data():
@@ -39,15 +39,12 @@ def load_data():
             final_angle = df['Angle (deg)'].max()
             
             # Each file gets its own extractor
-            extractor = ExpandingFeatureExtractor(
-                features=["mean", "std", "max", "min", "last", "median", "slope"],
-                columns=FEATURES
-            )
+            extractor = ExpandingFeatureExtractor()
             
             # Sample multiple windows from each file
             # We use more granular steps for regression to capture the approach
             last_idx = 0
-            for percent in np.linspace(0.1, 0.9, 10):
+            for percent in [0.1 ,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
                 idx = int(n_rows * percent)
                 if idx - last_idx < 1:
                     continue
@@ -56,7 +53,7 @@ def load_data():
                 features = extractor.update(chunk)
                 
                 # Get the last angle from the extracted features
-                current_angle = features["Angle (deg)_last"]
+                current_angle = df['Angle (deg)'].iloc[idx - 1]
                 remaining_angle = final_angle - current_angle
                 
                 all_samples.append({
@@ -67,7 +64,7 @@ def load_data():
                 last_idx = idx
                     
         except Exception as e:
-            # print(f"Error reading {file_path}: {e}")
+            print(f"Error reading {file_path}: {e}")
             pass
                 
     return all_samples
@@ -143,7 +140,7 @@ def main():
     }
     
     # Save the models
-    joblib.dump(results, "p6/regressors_ml.joblib")
+    joblib.dump(results, "regressors_ml.joblib")
     print("\nModels saved to p6/regressors_ml.joblib")
 
 if __name__ == "__main__":

@@ -1,7 +1,6 @@
 import pyarrow as pa
 import numpy as np
-import pandas as pd
-from ._p6 import ExpandingExtractor as _ExpandingExtractor
+from _p6 import ExpandingExtractor as _ExpandingExtractor
 
 class ExpandingFeatureExtractor:
     def __init__(self, features=None, columns=None):
@@ -10,12 +9,12 @@ class ExpandingFeatureExtractor:
         columns: List of column names to expect in the input batches
         """
         if features is None:
-            self.feature_names = ["mean", "std_dev", "max_value", "min_value", "last", "median", "slope"]
+            self.feature_names = ["total_sum", "mean", "variance", "std", "min", "max", "energy", "rms", "zero_crossing_rate", "mean_abs_change", "mean_change", "cid_ce", "auc", "skewness", "kurtosis"]
         else:
             self.feature_names = features
             
         if columns is None:
-            self.columns = ["Torque (Nm)", "Current (V)", "Depth (mm)"]
+            self.columns = ["Torque (Nm)", "Current (V)"]
         else:
             self.columns = columns
             

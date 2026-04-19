@@ -4,9 +4,9 @@ from flask_socketio import SocketIO
 from threading import Thread
 import pandas as pd
 from flask import request
-from . import lttb_indices
-from .collector import Collector
-from .predictor import MLPredictor, RegressionPredictor, LSTMPredictor
+from _p6 import lttb_indices
+from collector import Collector
+from predictor import MLPredictor, RegressionPredictor, LSTMPredictor
 
 # create flask app
 app = Flask(__name__)
@@ -34,6 +34,16 @@ w = None
 @app.route('/')
 def index():
     return "API is running"
+
+@app.route('/version')
+def version():
+    if not w:
+        return {"version": "collector-not-initialized"}
+    if type(w).__name__ == "FakeCollector":
+        return {"version": "collector-fake"}
+    if type(w).__name__ == "Collector":
+        return {"version": "collector-real"}
+    return {"version": "collector-unknown"}
 
 @app.route('/predict')
 def predict_kxml():
@@ -286,7 +296,7 @@ def main(args=None):
 
 def fake_main(args=None):
     global w
-    from . import fake_collector
+    import fake_collector
     w = fake_collector.FakeCollector(socketio=socketio)
     Thread(target=w.run).start()
     Thread(target=w.plc_run).start()

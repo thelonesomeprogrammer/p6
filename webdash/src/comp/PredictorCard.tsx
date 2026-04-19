@@ -27,7 +27,20 @@ const PredictorCard: React.FC<{ className?: string }> = ({ className = "" }) => 
                 setError(data.error);
                 setPredictions([]);
             } else if (data.predictions) {
-                setPredictions(data.predictions);
+                const normalized = data.predictions.map((p: any) => {
+                    if (p.prediction && typeof p.prediction === "object") {
+                        return p.prediction;
+                    }
+                    if (p.classification && typeof p.classification === "object") {
+                        return {
+                            ...p,
+                            prediction: p.classification.prediction || "M",
+                            probabilities: p.classification.probabilities || {},
+                        };
+                    }
+                    return p;
+                });
+                setPredictions(normalized);
             }
         } catch (e: any) {
             if (e.name === "AbortError") return;

@@ -5,10 +5,10 @@ import warnings
 import pandas as pd
 import torch
 import torch.nn as nn
-from .extractor import ExpandingFeatureExtractor
+from extractor import ExpandingFeatureExtractor
 
 class MLPredictor:
-    def __init__(self, model_type="rf", model_path="p6/predictors_ml.joblib"):
+    def __init__(self, model_type="rf", model_path="predictors_ml.joblib"):
         """
         model_type: "rf" for Random Forest, "gb" for Gradient Boosting
         """
@@ -104,7 +104,7 @@ class MLPredictor:
         }
 
 class RegressionPredictor:
-    def __init__(self, model_type="rf_regressor", model_path="p6/regressors_ml.joblib"):
+    def __init__(self, model_type="rf_regressor", model_path="regressors_ml.joblib"):
         """
         model_type: "rf_regressor", "gb_regressor", or "lr_regressor"
         """

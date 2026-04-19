@@ -8,8 +8,8 @@ from torch.utils.data import DataLoader, Dataset
 import joblib
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from .extractor import ExpandingFeatureExtractor
-from .predictor import LSTMModel
+from extractor import ExpandingFeatureExtractor
+from predictor import LSTMModel
 
 # Constants
 DATA_DIR = "prev-data/Dataset/Intrinsic data/N"
@@ -41,7 +41,7 @@ def load_sequences():
     # We'll use this to fit the scaler first
     feature_vectors = []
 
-    for file in files:
+    for (idx, file) in enumerate(files):
         file_path = os.path.join(DATA_DIR, file)
         try:
             df = pd.read_csv(file_path)
@@ -54,8 +54,6 @@ def load_sequences():
             
             final_angle = df['Angle (deg)'].max()
             extractor = ExpandingFeatureExtractor(
-                features=["mean", "std", "max", "min", "last", "median", "slope"],
-                columns=FEATURES
             )
             
             file_features = []
@@ -63,7 +61,7 @@ def load_sequences():
             
             # Step through the file to create a sequence of feature states
             # For LSTM we want more frequent updates
-            for i in range(5, n_rows, 5):
+            for i in range(100, n_rows, 100):
                 chunk = df.iloc[i-5:i]
                 stats = extractor.update(chunk)
                 
@@ -71,16 +69,19 @@ def load_sequences():
                 feat_vec = [stats[k] for k in feat_names]
                 
                 file_features.append(feat_vec)
-                file_targets.append(final_angle - stats["Angle (deg)_last"])
+                file_targets.append(final_angle - df['Angle (deg)'].iloc[i-1])
                 feature_vectors.append(feat_vec)
 
             # Create sequences of SEQ_LEN
             for i in range(SEQ_LEN, len(file_features)):
                 all_features.append(file_features[i-SEQ_LEN:i])
                 all_targets.append(file_targets[i-1])
+            print(f"Loaded {len(file_features)} feature states from {file} as number {idx+1} of {len(files)}.     ", end='\r', flush=True)
                     
-        except Exception as e:
+        except Exception:
             pass
+
+    print(f"Loaded {len(all_features)} sequences.")
                 
     return np.array(all_features), np.array(all_targets), feat_names
 
@@ -111,7 +112,7 @@ def train():
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     print("Training LSTM...")
-    epochs = 20
+    epochs = 4000
     for epoch in range(epochs):
         model.train()
         train_loss = 0
@@ -127,12 +128,11 @@ def train():
             print(f"Epoch {epoch+1}/{epochs}, Loss: {train_loss/len(train_loader):.4f}")
 
     # Save
-    os.makedirs("p6", exist_ok=True)
     torch.save({
         'model_state_dict': model.state_dict(),
         'feature_names': feature_names
-    }, "p6/lstm_regressor.pth")
-    joblib.dump(scaler, "p6/lstm_scaler.joblib")
+    }, "lstm_regressor.pth")
+    joblib.dump(scaler, "lstm_scaler.joblib")
     print("LSTM Model and Scaler saved.")
 
 if __name__ == "__main__":
