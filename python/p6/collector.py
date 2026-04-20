@@ -51,8 +51,8 @@ class Collector():
                 [0, 450]
                 ]
 
-        self.cols = ['Time(ms)', 'TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)', 
-                     'TCP_rx(mm)', 'TCP_ry(mm)', 'TCP_rz(mm)', 'Robot_I(A)']
+        self.cols = ['Time (ms)', 'TCP_x (mm)', 'TCP_y (mm)', 'TCP_z (mm)', 
+                     'TCP_rx (mm)', 'TCP_ry (mm)', 'TCP_rz (mm)', 'Robot_I (A)']
 
         self.directory = 'data/'
         if not os.path.exists(self.directory):
@@ -64,7 +64,7 @@ class Collector():
         self.observer.start()
 
         self.kxml_data = []
-        self.kxml_cols = ['Time(ms)', 'Nset(1/min)', 'Torque(Nm)', 'Current(V)', 'Angle(°)', 'Depth(mm)']
+        self.kxml_cols = ['Time (ms)', 'Nset (1/min)', 'Torque (Nm)', 'Current (V)', 'Angle (deg)', 'Depth (mm)']
 
         # Set up the variables for the PLC signal monitoring
         self.counter = 1
@@ -166,8 +166,8 @@ class Collector():
         self.counter += 1
         df = pd.DataFrame(data=self.data, columns=self.cols)
         df = df.map(self.unsigned)
-        df[['TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)']] /= 10
-        df[['TCP_rx(mm)', 'TCP_ry(mm)', 'TCP_rz(mm)', 'Robot_I(A)']] /= 1000
+        df[['TCP_x (mm)', 'TCP_y (mm)', 'TCP_z (mm)']] /= 10
+        df[['TCP_rx (mm)', 'TCP_ry (mm)', 'TCP_rz (mm)', 'Robot_I (A)']] /= 1000
 
         filename_t = os.path.join(self.directory, f"data_{self.today}_{self.counter}_{classification}_robot")
         df.to_csv(filename_t+".csv", index=False)
@@ -194,8 +194,8 @@ class Collector():
 
             df_modbus = pd.DataFrame(data=modbus_data, columns=self.cols)
             df_modbus = df_modbus.map(self.unsigned)
-            df_modbus[['TCP_x(mm)', 'TCP_y(mm)', 'TCP_z(mm)']] /= 10
-            df_modbus[['TCP_rx(mm)', 'TCP_ry(mm)', 'TCP_rz(mm)', 'Robot_I(A)']] /= 1000
+            df_modbus[['TCP_x (mm)', 'TCP_y (mm)', 'TCP_z (mm)']] /= 10
+            df_modbus[['TCP_rx (mm)', 'TCP_ry (mm)', 'TCP_rz (mm)', 'Robot_I (A)']] /= 1000
             filename_modbus = os.path.join(self.directory, f"data_{self.today}_{self.counter}_{classification}_robot")
             df_modbus.to_csv(filename_modbus+".csv", index=False)
             self.counter += 1

@@ -62,8 +62,8 @@ const socketMode = (model: string, setModel: (m: string) => void) => {
 				<ModelSelector model={model} setModel={setModel} />
 			</div>
 			<div className="flex gap-4">
-				<RobotMonitor className="flex-1" />
-				<ScrewSocket className="flex-1" />
+				<RobotMonitor />
+				<ScrewSocket />
 				<PredictionPlotter />
 			</div>
 			<KXMLSocket />

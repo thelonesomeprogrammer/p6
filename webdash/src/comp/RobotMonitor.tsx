@@ -55,7 +55,7 @@ function RobotMonitor({ className = "" }: { className?: string }) {
 
 	return (
 		<Card className={`flex flex-col ${className}`}>
-			<div className="flex justify-between items-center">
+			<div className="flex justify-between items-center min-w-[200px]">
 				<h2 className="text-lg font-semibold text-gray-700">Robot Monitor</h2>
 				<div className="flex items-center gap-2 text-xs">
 					<span

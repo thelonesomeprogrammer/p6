@@ -21,16 +21,27 @@ export const ScrewCore: React.FC<ScrewCoreProps> = ({
 	error,
 	className = "",
 }) => {
-	const remaining = prediction?.remaining_angle ?? 3100;
+	// Constants for Screw Animation
+	const TOTAL_ANGLE = 3100;
+	const SCREW_HEIGHT = 80; // Total height of the screw container
+	const HEAD_HEIGHT = 8; // Height of the screw head
+	const MAX_TRAVEL = 72; // Move 72px so head (8px) stays above surface (80-72=8)
+	const START_Y = -SCREW_HEIGHT; // Start with tip at surface (50%)
+
+	const remaining = prediction?.remaining_angle ?? TOTAL_ANGLE;
 	const percentIn = Math.max(
 		0,
-		Math.min(100, ((3100 - remaining) / 3100) * 100),
+		Math.min(100, ((TOTAL_ANGLE - remaining) / TOTAL_ANGLE) * 100),
 	);
+
+	// Calculate vertical position: Start at -80px (tip at surface) 
+	// and move down by MAX_TRAVEL (72px) at 100%
+	const translateY = START_Y + (percentIn / 100) * MAX_TRAVEL;
 
 	const hasFinalClass = prediction && prediction.prediction;
 
 	return (
-		<Card className={`flex flex-col min-w-[180px] h-full ${className}`}>
+		<Card className={`flex h-full ${className}`}>
 			<div className="flex justify-between items-center mb-4">
 				<h2 className="text-sm font-semibold text-gray-700">Screw Animation</h2>
 				{isLoading && (
@@ -40,8 +51,9 @@ export const ScrewCore: React.FC<ScrewCoreProps> = ({
 				)}
 			</div>
 
-			<div className="flex-1 relative bg-gray-50 rounded-lg border border-gray-100 overflow-hidden min-h-[140px] flex flex-col items-center justify-center">
-				<div className="absolute top-1/2 left-1/2 -translate-x-1/2 w-12 h-1/2 bg-[#8b4513] border-t-2 border-[#5d2e0d] shadow-[inset_0_4px_8px_rgba(0,0,0,0.2)]">
+			<div className="flex relative bg-gray-50 rounded-lg border border-gray-100 overflow-hidden min-h-[140px] flex flex-col items-center justify-center">
+				{/* Material/Hole */}
+				<div className="w-full absolute top-1/2 left-1/2 -translate-x-1/2 w-12 h-1/2 bg-[#8b4513] border-t-2 border-[#5d2e0d] shadow-[inset_0_4px_8px_rgba(0,0,0,0.2)]">
 					<div
 						className="absolute inset-0 opacity-10"
 						style={{
@@ -52,14 +64,15 @@ export const ScrewCore: React.FC<ScrewCoreProps> = ({
 					<div className="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-1.5 bg-[#4a250b] rounded-full blur-[1px]" />
 				</div>
 
+				{/* Screw */}
 				<div
 					className="absolute left-1/2 w-6"
 					style={{
 						top: "50%",
-						height: "80px",
-						transform: `translateX(-50%) translateY(${-80 + percentIn * 0.75}px)`,
+						height: `${SCREW_HEIGHT}px`,
+						transform: `translateX(-50%) translateY(${translateY}px)`,
 						transition:
-							"transform 2.5s cubic-bezier(0.45, 0.05, 0.55, 0.95), opacity 0.5s ease-in-out",
+							"transform 0.2s cubic-bezier(0.45, 0.05, 0.55, 0.95), opacity 0.1s ease-in-out",
 						zIndex: 10,
 						opacity: hasFinalClass && prediction.prediction !== "M" ? 1 : 0,
 						pointerEvents: hasFinalClass ? "auto" : "none",
@@ -84,7 +97,7 @@ export const ScrewCore: React.FC<ScrewCoreProps> = ({
 									"repeating-linear-gradient(-20deg, transparent, transparent 3px, #444 3px, #444 5px)",
 								backgroundPosition: `0 ${percentIn * 2}px`,
 								transition:
-									"background-position 2.5s cubic-bezier(0.45, 0.05, 0.55, 0.95)",
+									"background-position 0.1s cubic-bezier(0.45, 0.05, 0.55, 0.95)",
 							}}
 						/>
 					</div>

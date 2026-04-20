@@ -9,10 +9,10 @@ from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.preprocessing import StandardScaler
 
 from extractor import ExpandingFeatureExtractor
+from utils import normalize_columns, INPUT_FEATURES, TARGET_COLUMN
 
 # Constants
 DATA_DIR = "prev-data/Dataset/Intrinsic data/N/"
-FEATURES = ["Torque (Nm)", "Current (V)"]
 
 def load_data():
     all_samples = []
@@ -28,15 +28,17 @@ def load_data():
         file_path = os.path.join(DATA_DIR, file)
         try:
             df = pd.read_csv(file_path)
+            df = normalize_columns(df)
+            
             # Ensure all needed columns are present
-            if not all(col in df.columns for col in FEATURES):
+            if not all(col in df.columns for col in INPUT_FEATURES + [TARGET_COLUMN]):
                 continue
                 
             n_rows = len(df)
             if n_rows < 10:
                 continue
             
-            final_angle = df['Angle (deg)'].max()
+            final_angle = df[TARGET_COLUMN].max()
             
             # Each file gets its own extractor
             extractor = ExpandingFeatureExtractor()
@@ -53,7 +55,7 @@ def load_data():
                 features = extractor.update(chunk)
                 
                 # Get the last angle from the extracted features
-                current_angle = df['Angle (deg)'].iloc[idx - 1]
+                current_angle = df[TARGET_COLUMN].iloc[idx - 1]
                 remaining_angle = final_angle - current_angle
                 
                 all_samples.append({

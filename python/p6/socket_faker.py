@@ -65,6 +65,7 @@ class Streamer(threading.Thread):
         categories = [d for d in os.listdir(INTRINSIC_DIR) if os.path.isdir(os.path.join(INTRINSIC_DIR, d))]
         categories.remove('P')
         cat = random.choice(categories)
+        cat = 'N'
         
         intrinsic_cat_dir = os.path.join(INTRINSIC_DIR, cat)
         files = [f for f in os.listdir(intrinsic_cat_dir) if f.endswith('.csv')]

@@ -8,6 +8,7 @@ from sklearn.metrics import classification_report, accuracy_score
 from sklearn.preprocessing import StandardScaler
 
 from extractor import ExpandingFeatureExtractor
+from utils import normalize_columns, INPUT_FEATURES
 
 # Constants
 DATA_DIR = "prev-data/Dataset/Intrinsic data"
@@ -18,7 +19,6 @@ FOLDERS_TO_LABELS = {
     "NS": "M"
 }
 IGNORE_FOLDERS = ["P"]
-FEATURES = ["Torque (Nm)", "Current (V)"]
 
 def load_data():
     all_samples = []
@@ -36,7 +36,13 @@ def load_data():
             file_path = os.path.join(folder_path, file)
             try:
                 df = pd.read_csv(file_path)
-                df = df[FEATURES]
+                df = normalize_columns(df)
+                
+                # Check if features exist after normalization
+                if not all(col in df.columns for col in INPUT_FEATURES):
+                    continue
+                
+                df = df[INPUT_FEATURES]
                 
                 n_rows = len(df)
                 if n_rows < 5:
