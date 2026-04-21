@@ -12,62 +12,90 @@ from extractor import ExpandingFeatureExtractor
 from utils import normalize_columns, INPUT_FEATURES, TARGET_COLUMN
 
 # Constants
-DATA_DIR = "prev-data/Dataset/Intrinsic data/N/"
+N_DATA_DIR = "prev-data/Dataset/Intrinsic data/N/"
+OT_DATA_DIR = "prev-data/Dataset/Intrinsic data/OT/"
+OT_LABELS_PATH = "prev-data/ot_labels.csv"
 
 def load_data():
     all_samples = []
     
-    if not os.path.exists(DATA_DIR):
-        print(f"Error: Folder {DATA_DIR} does not exist.")
-        return []
+    # Load OT labels
+    if os.path.exists(OT_LABELS_PATH):
+        ot_labels = pd.read_csv(OT_LABELS_PATH).set_index("file_name")["true_ta_angle"].to_dict()
+    else:
+        print(f"Warning: {OT_LABELS_PATH} not found.")
+        ot_labels = {}
             
-    files = [f for f in os.listdir(DATA_DIR) if f.endswith('.csv')]
-    print(f"Loading {len(files)} files from {DATA_DIR} for regression...")
+    data_configs = [
+        {"dir": N_DATA_DIR, "category": "N"},
+        {"dir": OT_DATA_DIR, "category": "OT"}
+    ]
     
-    for file in files:
-        file_path = os.path.join(DATA_DIR, file)
-        try:
-            df = pd.read_csv(file_path)
-            df = normalize_columns(df)
-            
-            # Ensure all needed columns are present
-            if not all(col in df.columns for col in INPUT_FEATURES + [TARGET_COLUMN]):
-                continue
+    for config in data_configs:
+        data_dir = config["dir"]
+        category = config["category"]
+        
+        if not os.path.exists(data_dir):
+            print(f"Warning: Folder {data_dir} does not exist. Skipping.")
+            continue
                 
-            n_rows = len(df)
-            if n_rows < 10:
-                continue
-            
-            final_angle = df[TARGET_COLUMN].max()
-            
-            # Each file gets its own extractor
-            extractor = ExpandingFeatureExtractor()
-            
-            # Sample multiple windows from each file
-            # We use more granular steps for regression to capture the approach
-            last_idx = 0
-            for percent in [0.1 ,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
-                idx = int(n_rows * percent)
-                if idx - last_idx < 1:
+        files = [f for f in os.listdir(data_dir) if f.endswith('.csv')]
+        print(f"Loading {len(files)} files from {data_dir} ({category}) for regression...")
+        
+        for file in files:
+            file_path = os.path.join(data_dir, file)
+            try:
+                df = pd.read_csv(file_path)
+                df = normalize_columns(df)
+                
+                # Ensure all needed columns are present
+                if not all(col in df.columns for col in INPUT_FEATURES + [TARGET_COLUMN]):
+                    continue
+                    
+                n_rows = len(df)
+                if n_rows < 10:
                     continue
                 
-                chunk = df.iloc[last_idx:idx]
-                features = extractor.update(chunk)
+                if category == "OT":
+                    if file in ot_labels:
+                        final_angle = ot_labels[file]
+                    else:
+                        continue # Skip OT files without labels
+                else:
+                    final_angle = df[TARGET_COLUMN].max()
                 
-                # Get the last angle from the extracted features
-                current_angle = df[TARGET_COLUMN].iloc[idx - 1]
-                remaining_angle = final_angle - current_angle
+                # Each file gets its own extractor
+                extractor = ExpandingFeatureExtractor()
                 
-                all_samples.append({
-                    "features": features,
-                    "target": remaining_angle,
-                    "file": file
-                })
-                last_idx = idx
+                # Sample multiple windows from each file
+                # We use more granular steps for regression to capture the approach
+                last_idx = 0
+                for percent in [0.1 ,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
+                    idx = int(n_rows * percent)
+                    if idx - last_idx < 1:
+                        continue
                     
-        except Exception as e:
-            print(f"Error reading {file_path}: {e}")
-            pass
+                    chunk = df.iloc[last_idx:idx]
+                    features = extractor.update(chunk)
+                    
+                    # Get the last angle from the extracted features
+                    current_angle = df[TARGET_COLUMN].iloc[idx - 1]
+                    remaining_angle = final_angle - current_angle
+                    
+                    # If beyond the zero point, it's 0
+                    if remaining_angle < 0:
+                        remaining_angle = 0
+                    
+                    all_samples.append({
+                        "features": features,
+                        "target": remaining_angle,
+                        "file": file
+                    })
+                    last_idx = idx
+                        
+            except Exception as e:
+                print(f"Error reading {file_path}: {e}")
+                pass
                 
     return all_samples
 

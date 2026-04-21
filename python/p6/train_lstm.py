@@ -13,7 +13,9 @@ from predictor import LSTMModel
 from utils import normalize_columns, INPUT_FEATURES, TARGET_COLUMN, LSTM_STEP_SIZE, LSTM_SEQ_LEN
 
 # Constants
-DATA_DIR = "prev-data/Dataset/Intrinsic data/N"
+N_DATA_DIR = "prev-data/Dataset/Intrinsic data/N"
+OT_DATA_DIR = "prev-data/Dataset/Intrinsic data/OT"
+OT_LABELS_PATH = "prev-data/ot_labels.csv"
 
 class TimeSeriesDataset(Dataset):
     def __init__(self, sequences, targets):
@@ -26,7 +28,7 @@ class TimeSeriesDataset(Dataset):
     def __getitem__(self, idx):
         return self.sequences[idx], self.targets[idx]
 
-def load_file_sequences(file_path):
+def load_file_sequences(file_path, final_angle=None):
     try:
         df = pd.read_csv(file_path)
         df = normalize_columns(df)
@@ -37,7 +39,9 @@ def load_file_sequences(file_path):
         if n_rows < LSTM_STEP_SIZE:
             return None
         
-        final_angle = df[TARGET_COLUMN].max()
+        if final_angle is None:
+            final_angle = df[TARGET_COLUMN].max()
+            
         extractor = ExpandingFeatureExtractor(columns=INPUT_FEATURES)
         
         file_features = []
@@ -52,8 +56,12 @@ def load_file_sequences(file_path):
             feat_names = sorted(stats.keys())
             feat_vec = [stats[k] for k in feat_names]
             
+            remaining_angle = final_angle - df[TARGET_COLUMN].iloc[end_idx-1]
+            if remaining_angle < 0:
+                remaining_angle = 0
+                
             file_features.append(feat_vec)
-            file_targets.append(final_angle - df[TARGET_COLUMN].iloc[end_idx-1])
+            file_targets.append(remaining_angle)
 
         # Create sequences
         sequences = []
@@ -62,27 +70,56 @@ def load_file_sequences(file_path):
             sequences.append(file_features[i-LSTM_SEQ_LEN:i])
             targets.append(file_targets[i-1])
             
+        if len(sequences) == 0:
+            return None
+            
         return np.array(sequences), np.array(targets), feat_names
     except Exception as e:
         print(f"Error processing {file_path}: {e}")
         return None
 
 def main():
-    if not os.path.exists(DATA_DIR):
-        print(f"Error: Folder {DATA_DIR} does not exist.")
-        return
+    # Load OT labels
+    if os.path.exists(OT_LABELS_PATH):
+        ot_labels = pd.read_csv(OT_LABELS_PATH).set_index("file_name")["true_ta_angle"].to_dict()
+    else:
+        print(f"Warning: {OT_LABELS_PATH} not found.")
+        ot_labels = {}
+
+    data_configs = [
+        {"dir": N_DATA_DIR, "category": "N"},
+        {"dir": OT_DATA_DIR, "category": "OT"}
+    ]
+    
+    all_file_tasks = []
+    for config in data_configs:
+        data_dir = config["dir"]
+        category = config["category"]
+        if not os.path.exists(data_dir):
+            print(f"Warning: Folder {data_dir} does not exist.")
+            continue
+        
+        files = [f for f in os.listdir(data_dir) if f.endswith('.csv')]
+        for f in files:
+            final_angle = None
+            if category == "OT":
+                if f in ot_labels:
+                    final_angle = ot_labels[f]
+                else:
+                    continue # Skip OT files without labels
             
-    files = [f for f in os.listdir(DATA_DIR) if f.endswith('.csv')]
-    print(f"Loading sequences from {len(files)} files...")
+            all_file_tasks.append((os.path.join(data_dir, f), final_angle))
+
+    print(f"Loading sequences from {len(all_file_tasks)} files...")
     
     # Split by file to prevent leakage
-    train_files, test_files = train_test_split(files, test_size=0.2, random_state=42)
+    train_tasks, test_tasks = train_test_split(all_file_tasks, test_size=0.2, random_state=42)
     
-    def process_files(file_list):
+    def process_tasks(task_list):
         all_X, all_y = [], []
         feat_names = None
-        for f in file_list:
-            res = load_file_sequences(os.path.join(DATA_DIR, f))
+        for file_path, final_angle in task_list:
+            res = load_file_sequences(file_path, final_angle)
             if res:
                 X, y, names = res
                 all_X.append(X)
@@ -91,8 +128,8 @@ def main():
         if not all_X: return None, None, None
         return np.concatenate(all_X), np.concatenate(all_y), feat_names
 
-    X_train_raw, y_train, feature_names = process_files(train_files)
-    X_test_raw, y_test, _ = process_files(test_files)
+    X_train_raw, y_train, feature_names = process_tasks(train_tasks)
+    X_test_raw, y_test, _ = process_tasks(test_tasks)
 
     if X_train_raw is None:
         print("No data loaded.")
@@ -118,13 +155,14 @@ def main():
 
     model = LSTMModel(input_size=F_tr, hidden_size=64, num_layers=2)
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.01)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10)
 
     print(f"Training LSTM on {len(X_train)} sequences, validating on {len(X_test)}...")
     
     epochs = 1000
     best_loss = float('inf')
-    patience = 15
+    patience = 30 # Increased patience since scheduler will reduce LR
     counter = 0
     
     for epoch in range(epochs):
@@ -149,8 +187,12 @@ def main():
         avg_train = train_loss/len(train_loader)
         avg_val = val_loss/len(test_loader)
         
+        # Step the scheduler
+        scheduler.step(avg_val)
+        
         if (epoch + 1) % 5 == 0:
-            print(f"Epoch {epoch+1}, Train Loss: {avg_train:.4f}, Val Loss: {avg_val:.4f}")
+            current_lr = optimizer.param_groups[0]['lr']
+            print(f"Epoch {epoch+1}, Train Loss: {avg_train:.4f}, Val Loss: {avg_val:.4f}, LR: {current_lr:.6f}")
             
         if avg_val < best_loss:
             best_loss = avg_val
