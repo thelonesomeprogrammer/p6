@@ -29,12 +29,30 @@ impl FastBitArray {
     }
 
     #[inline]
+    pub fn unset_batch<const N: usize>(&mut self, indices: [usize; N]) {
+        let mut mask = 0u64;
+        for i in indices {
+            mask |= 1 << i;
+        }
+        self.0 &= !mask;
+    }
+
+    #[inline]
     pub fn any<const N: usize>(&self, indices: [usize; N]) -> bool {
         let mut mask = 0u64;
         for i in indices {
             mask |= 1 << i;
         }
         (self.0 & mask) != 0
+    }
+
+    #[inline]
+    pub fn all<const N: usize>(&self, indices: [usize; N]) -> bool {
+        let mut mask = 0u64;
+        for i in indices {
+            mask |= 1 << i;
+        }
+        (self.0 & mask) == mask
     }
 }
 
@@ -89,6 +107,42 @@ pub enum Feature {
     TurningPoints,
     ZeroCrossingMean,
     ZeroCrossingStd,
+    AbsMax,
+    FirstLocMax,
+    LastLocMax,
+    FirstLocMin,
+    LastLocMin,
+    Autocorr(u16),
+    PartialAutocorr(u16),
+    TimeReversalAsymmetry(u16),
+    FftCoefficient(u16, FftAttr),
+    ApproxEntropy(u8, u32), // r is encoded as u32 (fixed point or bitcast)
+    AggLinearTrend(AggAttr, u16, AggFunc),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Copy)]
+pub enum FftAttr {
+    Real,
+    Imag,
+    Abs,
+    Angle,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Copy)]
+pub enum AggAttr {
+    Slope,
+    Intercept,
+    Stderr,
+    RValue,
+    PValue,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Copy)]
+pub enum AggFunc {
+    Max,
+    Min,
+    Mean,
+    Var,
 }
 
 impl From<String> for Feature {
@@ -128,18 +182,78 @@ impl From<String> for Feature {
             "turning_points" => Feature::TurningPoints,
             "zero_crossing_mean" => Feature::ZeroCrossingMean,
             "zero_crossing_std" => Feature::ZeroCrossingStd,
+            "abs_max" => Feature::AbsMax,
+            "first_loc_max" => Feature::FirstLocMax,
+            "last_loc_max" => Feature::LastLocMax,
+            "first_loc_min" => Feature::FirstLocMin,
+            "last_loc_min" => Feature::LastLocMin,
             e => {
                 if let Some(arg) = e.strip_prefix("paa-") {
                     let params: Vec<&str> = arg.split('-').collect();
-                    if params.len() == 2
-                        && let (Ok(n), Ok(m)) = (params[0].parse::<u16>(), params[1].parse::<u16>())
-                    {
-                        return Feature::Paa(n, m);
+                    if params.len() == 2 {
+                        if let (Ok(n), Ok(m)) = (params[0].parse::<u16>(), params[1].parse::<u16>()) {
+                            return Feature::Paa(n, m);
+                        }
                     }
                 } else if let Some(arg) = e.strip_prefix("c3-") {
                     let param = arg.trim();
                     if let Ok(n) = param.parse::<u16>() {
                         return Feature::C3(n);
+                    }
+                } else if let Some(arg) = e.strip_prefix("autocorr-") {
+                    if let Ok(n) = arg.parse::<u16>() {
+                        return Feature::Autocorr(n);
+                    }
+                } else if let Some(arg) = e.strip_prefix("partial_autocorr-") {
+                    if let Ok(n) = arg.parse::<u16>() {
+                        return Feature::PartialAutocorr(n);
+                    }
+                } else if let Some(arg) = e.strip_prefix("time_reversal_asymmetry-") {
+                    if let Ok(n) = arg.parse::<u16>() {
+                        return Feature::TimeReversalAsymmetry(n);
+                    }
+                } else if let Some(arg) = e.strip_prefix("fft_coeff-") {
+                    let params: Vec<&str> = arg.split('-').collect();
+                    if params.len() == 2 {
+                        if let Ok(coeff) = params[0].parse::<u16>() {
+                            let attr = match params[1] {
+                                "real" => FftAttr::Real,
+                                "imag" => FftAttr::Imag,
+                                "abs" => FftAttr::Abs,
+                                "angle" => FftAttr::Angle,
+                                _ => panic!("Unknown FFT attribute: {}", params[1]),
+                            };
+                            return Feature::FftCoefficient(coeff, attr);
+                        }
+                    }
+                } else if let Some(arg) = e.strip_prefix("approx_entropy-") {
+                    let params: Vec<&str> = arg.split('-').collect();
+                    if params.len() == 2 {
+                        if let (Ok(m), Ok(r)) = (params[0].parse::<u8>(), params[1].parse::<f32>()) {
+                            return Feature::ApproxEntropy(m, r.to_bits());
+                        }
+                    }
+                } else if let Some(arg) = e.strip_prefix("agg_linear_trend-") {
+                    let params: Vec<&str> = arg.split('-').collect();
+                    if params.len() == 3 {
+                        let attr = match params[0] {
+                            "slope" => AggAttr::Slope,
+                            "intercept" => AggAttr::Intercept,
+                            "stderr" => AggAttr::Stderr,
+                            "rvalue" => AggAttr::RValue,
+                            "pvalue" => AggAttr::PValue,
+                            _ => panic!("Unknown Agg attribute: {}", params[0]),
+                        };
+                        if let Ok(chunk_len) = params[1].parse::<u16>() {
+                            let func = match params[2] {
+                                "max" => AggFunc::Max,
+                                "min" => AggFunc::Min,
+                                "mean" => AggFunc::Mean,
+                                "var" => AggFunc::Var,
+                                _ => panic!("Unknown Agg function: {}", params[2]),
+                            };
+                            return Feature::AggLinearTrend(attr, chunk_len, func);
+                        }
                     }
                 }
                 panic!("Unknown feature: {}", e);
@@ -185,6 +299,42 @@ impl Feature {
             Feature::ZeroCrossingStd => "zero_crossing_std".to_string(),
             Feature::C3(lag) => format!("c3-{}", lag),
             Feature::Paa(total, index) => format!("paa-{}-{}", total, index),
+            Feature::AbsMax => "abs_max".to_string(),
+            Feature::FirstLocMax => "first_loc_max".to_string(),
+            Feature::LastLocMax => "last_loc_max".to_string(),
+            Feature::FirstLocMin => "first_loc_min".to_string(),
+            Feature::LastLocMin => "last_loc_min".to_string(),
+            Feature::Autocorr(lag) => format!("autocorr-{}", lag),
+            Feature::PartialAutocorr(lag) => format!("partial_autocorr-{}", lag),
+            Feature::TimeReversalAsymmetry(lag) => format!("time_reversal_asymmetry-{}", lag),
+            Feature::FftCoefficient(coeff, attr) => {
+                let attr_str = match attr {
+                    FftAttr::Real => "real",
+                    FftAttr::Imag => "imag",
+                    FftAttr::Abs => "abs",
+                    FftAttr::Angle => "angle",
+                };
+                format!("fft_coeff-{}-{}", coeff, attr_str)
+            }
+            Feature::ApproxEntropy(m, r_bits) => {
+                format!("approx_entropy-{}-{}", m, f32::from_bits(*r_bits))
+            }
+            Feature::AggLinearTrend(attr, chunk_len, func) => {
+                let attr_str = match attr {
+                    AggAttr::Slope => "slope",
+                    AggAttr::Intercept => "intercept",
+                    AggAttr::Stderr => "stderr",
+                    AggAttr::RValue => "rvalue",
+                    AggAttr::PValue => "pvalue",
+                };
+                let func_str = match func {
+                    AggFunc::Max => "max",
+                    AggFunc::Min => "min",
+                    AggFunc::Mean => "mean",
+                    AggFunc::Var => "var",
+                };
+                format!("agg_linear_trend-{}-{}-{}", attr_str, chunk_len, func_str)
+            }
             _ => "unknown".to_string(),
         }
     }

@@ -6,7 +6,7 @@ import pandas as pd
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO
 from flask_cors import CORS
-from predictor import MLPredictor, RegressionPredictor, LSTMPredictor
+from .predictor import MLPredictor, RegressionPredictor, LSTMPredictor
 
 app = Flask(__name__)
 CORS(app)
@@ -238,6 +238,9 @@ def get_status():
 def get_version():
     return {"version": "socket-faker"}
 
-if __name__ == '__main__':
+def main():
     streamer.start()
     socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+
+if __name__ == '__main__':
+    main()

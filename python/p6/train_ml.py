@@ -7,8 +7,8 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.preprocessing import StandardScaler
 
-from extractor import ExpandingFeatureExtractor
-from utils import normalize_columns, INPUT_FEATURES
+from .extractor import ExpandingFeatureExtractor
+from . import utils
 
 # Constants
 DATA_DIR = "prev-data/Dataset/Intrinsic data"
@@ -36,13 +36,13 @@ def load_data():
             file_path = os.path.join(folder_path, file)
             try:
                 df = pd.read_csv(file_path)
-                df = normalize_columns(df)
+                df = utils.normalize_columns(df)
                 
                 # Check if features exist after normalization
-                if not all(col in df.columns for col in INPUT_FEATURES):
+                if not all(col in df.columns for col in utils.INPUT_FEATURES):
                     continue
                 
-                df = df[INPUT_FEATURES]
+                df = df[utils.INPUT_FEATURES]
                 
                 n_rows = len(df)
                 if n_rows < 5:

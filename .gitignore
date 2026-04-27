@@ -12,3 +12,7 @@ __pycache__/
 prev-data/
 target/
 data/
+
+.zai/
+
+_p6.cpython-313-x86_64-linux-gnu.so

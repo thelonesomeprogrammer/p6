@@ -4,12 +4,12 @@ import numpy as np
 import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.linear_model import LinearRegression
+from sktime.regression.interval_based import TimeSeriesForestRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.preprocessing import StandardScaler
 
-from extractor import ExpandingFeatureExtractor
-from utils import normalize_columns, INPUT_FEATURES, TARGET_COLUMN
+from .extractor import ExpandingFeatureExtractor
+from . import utils
 
 # Constants
 N_DATA_DIR = "prev-data/Dataset/Intrinsic data/N/"
@@ -46,10 +46,10 @@ def load_data():
             file_path = os.path.join(data_dir, file)
             try:
                 df = pd.read_csv(file_path)
-                df = normalize_columns(df)
+                df = utils.normalize_columns(df)
                 
                 # Ensure all needed columns are present
-                if not all(col in df.columns for col in INPUT_FEATURES + [TARGET_COLUMN]):
+                if not all(col in df.columns for col in utils.INPUT_FEATURES + [utils.TARGET_COLUMN]):
                     continue
                     
                 n_rows = len(df)
@@ -62,7 +62,7 @@ def load_data():
                     else:
                         continue # Skip OT files without labels
                 else:
-                    final_angle = df[TARGET_COLUMN].max()
+                    final_angle = df[utils.TARGET_COLUMN].max()
                 
                 # Each file gets its own extractor
                 extractor = ExpandingFeatureExtractor()
@@ -79,7 +79,7 @@ def load_data():
                     features = extractor.update(chunk)
                     
                     # Get the last angle from the extracted features
-                    current_angle = df[TARGET_COLUMN].iloc[idx - 1]
+                    current_angle = df[utils.TARGET_COLUMN].iloc[idx - 1]
                     remaining_angle = final_angle - current_angle
                     
                     # If beyond the zero point, it's 0
@@ -156,15 +156,15 @@ def main():
         "features": list(X.columns)
     }
 
-    # Model 3: Linear Regression
-    print("\nTraining LinearRegression...")
-    lr = LinearRegression()
-    lr.fit(X_train_scaled, y_train)
-    y_pred_lr = lr.predict(X_test_scaled)
-    print(f"LR MAE: {mean_absolute_error(y_test, y_pred_lr):.4f}")
-    print(f"LR R2: {r2_score(y_test, y_pred_lr):.4f}")
-    results["lr_regressor"] = {
-        "model": lr,
+    # Model 3: Time Series Forest Regressor
+    print("\nTraining TimeSeriesForestRegressor...")
+    tsf = TimeSeriesForestRegressor(n_estimators=100, random_state=42)
+    tsf.fit(X_train_scaled, y_train)
+    y_pred_tsf = tsf.predict(X_test_scaled)
+    print(f"TSF MAE: {mean_absolute_error(y_test, y_pred_tsf):.4f}")
+    print(f"TSF R2: {r2_score(y_test, y_pred_tsf):.4f}")
+    results["tsf_regressor"] = {
+        "model": tsf,
         "scaler": scaler,
         "features": list(X.columns)
     }

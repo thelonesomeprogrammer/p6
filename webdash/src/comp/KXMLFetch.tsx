@@ -9,7 +9,7 @@ export const KXMLFetch: React.FC = () => {
 
 	const fetchData = useCallback(async (signal?: AbortSignal) => {
 		try {
-			const response = await fetch("http://localhost:5000/kxml_data?points=500", {
+			const response = await fetch(`http://${window.location.hostname}:5000/kxml_data?points=500`, {
 				signal,
 			});
 			const raw = await response.json();

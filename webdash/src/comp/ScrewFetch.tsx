@@ -17,7 +17,7 @@ export const ScrewFetch: React.FC<{ className?: string }> = ({
 			setError(null);
 			try {
 				const res = await fetch(
-					`http://localhost:5000/predict_all?model=${modelType}`,
+					`http://${window.location.hostname}:5000/predict_all?model=${modelType}`,
 					{ signal },
 				);
 				const data = await res.json();

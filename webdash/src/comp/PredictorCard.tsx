@@ -21,7 +21,7 @@ const PredictorCard: React.FC<{ className?: string }> = ({ className = "" }) => 
         setIsLoading(true);
         setError(null);
         try {
-            const res = await fetch(`http://localhost:5000/predict_all?model=${modelType}`, { signal });
+            const res = await fetch(`http://${window.location.hostname}:5000/predict_all?model=${modelType}`, { signal });
             const data = await res.json();
             if (data.error) {
                 setError(data.error);

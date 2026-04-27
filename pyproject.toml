@@ -11,16 +11,18 @@ dependencies = [
     "flask-socketio>=5.6.1",
     "joblib>=1.5.3",
     "numpy>=2.0.0",
-    "pandas>=3.0.1",
+    "pandas>=2.3.0",
     "pymodbustcp>=0.3.0",
     "pyserial>=3.5",
     "python-snap7>=2.1.0",
-    "scikit-learn>=1.8.0",
+    "scikit-learn>=1.7.0",
     "torch>=2.10.0",
     "torchvision>=0.25.0",
     "maturin>=1.5,<2.0",
     "pyarrow",
     "matplotlib>=3.10.8",
+    "watchdog>=6.0.0",
+		"sktime>=0.40.0",
 ]
 
 [build-system]
@@ -39,3 +41,8 @@ dev = [
 [project.scripts]
 p6 = "p6.main:main"
 p6-fake = "p6.main:fake_main"
+p6-train-lstm = "p6.train_lstm:main"
+p6-train-ml = "p6.train_ml:main"
+p6-train-regression = "p6.train_regression:main"
+p6-socket-faker = "p6.socket_faker:main"
+

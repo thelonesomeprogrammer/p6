@@ -8,9 +8,9 @@ from torch.utils.data import DataLoader, Dataset
 import joblib
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from extractor import ExpandingFeatureExtractor
-from predictor import LSTMModel
-from utils import normalize_columns, INPUT_FEATURES, TARGET_COLUMN, LSTM_STEP_SIZE, LSTM_SEQ_LEN
+from .extractor import ExpandingFeatureExtractor
+from .predictor import LSTMModel
+from . import utils
 
 # Constants
 N_DATA_DIR = "prev-data/Dataset/Intrinsic data/N"
@@ -31,32 +31,32 @@ class TimeSeriesDataset(Dataset):
 def load_file_sequences(file_path, final_angle=None):
     try:
         df = pd.read_csv(file_path)
-        df = normalize_columns(df)
-        if not all(col in df.columns for col in INPUT_FEATURES + [TARGET_COLUMN]):
+        df = utils.normalize_columns(df)
+        if not all(col in df.columns for col in utils.INPUT_FEATURES + [utils.TARGET_COLUMN]):
             return None
         
         n_rows = len(df)
-        if n_rows < LSTM_STEP_SIZE:
+        if n_rows < utils.LSTM_STEP_SIZE:
             return None
         
         if final_angle is None:
-            final_angle = df[TARGET_COLUMN].max()
+            final_angle = df[utils.TARGET_COLUMN].max()
             
-        extractor = ExpandingFeatureExtractor(columns=INPUT_FEATURES)
+        extractor = ExpandingFeatureExtractor(columns=utils.INPUT_FEATURES)
         
         file_features = []
         file_targets = []
         
         # Consistent sampling: process every LSTM_STEP_SIZE rows
-        for i in range(0, n_rows, LSTM_STEP_SIZE):
-            end_idx = min(i + LSTM_STEP_SIZE, n_rows)
+        for i in range(0, n_rows, utils.LSTM_STEP_SIZE):
+            end_idx = min(i + utils.LSTM_STEP_SIZE, n_rows)
             chunk = df.iloc[i:end_idx]
             stats = extractor.update(chunk)
             
             feat_names = sorted(stats.keys())
             feat_vec = [stats[k] for k in feat_names]
             
-            remaining_angle = final_angle - df[TARGET_COLUMN].iloc[end_idx-1]
+            remaining_angle = final_angle - df[utils.TARGET_COLUMN].iloc[end_idx-1]
             if remaining_angle < 0:
                 remaining_angle = 0
                 
@@ -66,8 +66,8 @@ def load_file_sequences(file_path, final_angle=None):
         # Create sequences
         sequences = []
         targets = []
-        for i in range(LSTM_SEQ_LEN, len(file_features) + 1):
-            sequences.append(file_features[i-LSTM_SEQ_LEN:i])
+        for i in range(utils.LSTM_SEQ_LEN, len(file_features) + 1):
+            sequences.append(file_features[i-utils.LSTM_SEQ_LEN:i])
             targets.append(file_targets[i-1])
             
         if len(sequences) == 0:

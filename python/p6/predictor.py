@@ -2,11 +2,10 @@ import numpy as np
 import joblib
 import os
 import warnings
-import pandas as pd
 import torch
 import torch.nn as nn
-from extractor import ExpandingFeatureExtractor
-from utils import normalize_columns, INPUT_FEATURES, LSTM_STEP_SIZE
+from .extractor import ExpandingFeatureExtractor
+from .utils import normalize_columns, INPUT_FEATURES, LSTM_STEP_SIZE
 
 class MLPredictor:
     def __init__(self, model_type="rf", model_path="predictors_ml.joblib"):

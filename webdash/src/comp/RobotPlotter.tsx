@@ -11,7 +11,7 @@ const RobotPlotter: React.FC = () => {
 
 	const fetchData = useCallback(async (signal?: AbortSignal) => {
 		try {
-			const response = await fetch("http://localhost:5000/data?points=500", { signal });
+			const response = await fetch(`http://${window.location.hostname}:5000/data?points=500`, { signal });
 			const raw = await response.json();
 			setData(raw.data || []);
 		} catch (error: any) {

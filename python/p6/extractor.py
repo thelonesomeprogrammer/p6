@@ -1,6 +1,7 @@
 import pyarrow as pa
 import numpy as np
-from _p6 import ExpandingExtractor as _ExpandingExtractor
+from ._p6 import ExpandingExtractor as _ExpandingExtractor
+from . import utils
 
 class ExpandingFeatureExtractor:
     def __init__(self, features=None, columns=None):
@@ -14,7 +15,7 @@ class ExpandingFeatureExtractor:
             self.feature_names = features
             
         if columns is None:
-            self.columns = ["Torque (Nm)", "Current (V)"]
+            self.columns = utils.INPUT_FEATURES
         else:
             self.columns = columns
             

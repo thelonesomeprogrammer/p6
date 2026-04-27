@@ -4,11 +4,13 @@ from flask_socketio import SocketIO
 from threading import Thread
 import pandas as pd
 from flask import request
-from _p6 import lttb_indices
-from collector import Collector
-from predictor import MLPredictor, RegressionPredictor, LSTMPredictor
+from ._p6 import lttb_indices
+from .collector import Collector
+from .predictor import MLPredictor, RegressionPredictor, LSTMPredictor
+import os
 
 # create flask app
+base_dir = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
@@ -29,11 +31,6 @@ except Exception as e:
 
 # Placeholder for the collector
 w = None
-
-# main flask page
-@app.route('/')
-def index():
-    return "API is running"
 
 @app.route('/version')
 def version():
@@ -296,7 +293,7 @@ def main(args=None):
 
 def fake_main(args=None):
     global w
-    import fake_collector
+    from . import fake_collector
     w = fake_collector.FakeCollector(socketio=socketio)
     Thread(target=w.run).start()
     Thread(target=w.plc_run).start()
