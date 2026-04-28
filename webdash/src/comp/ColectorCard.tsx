@@ -30,9 +30,9 @@ const ColectorCard: React.FC<{ className?: string }> = ({ className = "" }) => {
 	const fetchInitialData = useCallback(async (signal?: AbortSignal) => {
 		try {
 			const [paramRes, collectRes, countRes] = await Promise.all([
-				fetch("http://localhost:5000/get/param", { signal }),
-				fetch("http://localhost:5000/get_collect", { signal }),
-				fetch("http://localhost:5000/get_collection_count", { signal }),
+				fetch(`http://${window.location.hostname}:5000/get/param`, { signal }),
+				fetch(`http://${window.location.hostname}:5000/get_collect`, { signal }),
+				fetch(`http://${window.location.hostname}:5000/get_collection_count`, { signal }),
 			]);
 
 			const paramData = await paramRes.json();
@@ -101,14 +101,14 @@ const ColectorCard: React.FC<{ className?: string }> = ({ className = "" }) => {
 		}
 	};
 	const saveClassification = () => {
-		handleAction(`http://localhost:5000/save/${classification}`);
+		handleAction(`http://${window.location.hostname}:5000/save/${classification}`);
 	};
 	const sendCounter = () => {
-		handleAction(`http://localhost:5000/set/counter/${counter}`);
+		handleAction(`http://${window.location.hostname}:5000/set/counter/${counter}`);
 	};
 	const sendDirectory = () => {
 		handleAction(
-			`http://localhost:5000/set/directory/${encodeURIComponent(directory)}`,
+			`http://${window.location.hostname}:5000/set/directory/${encodeURIComponent(directory)}`,
 		);
 	};
 
@@ -116,12 +116,12 @@ const ColectorCard: React.FC<{ className?: string }> = ({ className = "" }) => {
 		const nextState = !isCollecting;
 		setIsCollecting(nextState);
 		handleAction(
-			`http://localhost:5000/${nextState ? "start_collection" : "stop_collection"}`,
+			`http://${window.location.hostname}:5000/${nextState ? "start_collection" : "stop_collection"}`,
 		);
 	};
 
 	const saveAll = () => {
-		handleAction("http://localhost:5000/save_all", {
+		handleAction(`http://${window.location.hostname}:5000/save_all`, {
 			classifications: multiClassifications.slice(0, collectionCount),
 		});
 		setMultiClassifications([]);
