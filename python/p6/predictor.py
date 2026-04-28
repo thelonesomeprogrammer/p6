@@ -142,6 +142,75 @@ class RegressionPredictor:
             "remaining_angle": float(prediction)
         }
 
+class SlidingPredictor:
+    def __init__(self, model_type="rf", model_path="regressors_slide.joblib"):
+        """
+        model_type: "rf" for Random Forest, "xgb" for XGBoost
+        """
+        if not os.path.exists(model_path):
+            # Try to find it in the same directory as this file
+            local_path = os.path.join(os.path.dirname(__file__), model_path)
+            if os.path.exists(local_path):
+                model_path = local_path
+            else:
+                raise FileNotFoundError(f"Model file {model_path} not found. Please run p6/train_reg_slide.py first.")
+        
+        all_models = joblib.load(model_path)
+        if model_type not in all_models:
+            raise ValueError(f"Model type {model_type} not found in {model_path}. Available: {list(all_models.keys())}")
+            
+        self.model = all_models[model_type]
+        self.scaler = all_models["scaler"]
+        self.feature_names = all_models["features"]
+        self.features = INPUT_FEATURES
+        
+        self.extractor = ExpandingFeatureExtractor(columns=self.features)
+        self.processed_count = 0
+        self.last_stats = None
+
+    def reset(self):
+        self.extractor = ExpandingFeatureExtractor(columns=self.features)
+        self.processed_count = 0
+        self.last_stats = None
+
+    def extract_features(self, df):
+        if len(df) < self.processed_count:
+            self.reset()
+
+        if len(df) <= self.processed_count:
+            if self.last_stats is None:
+                return None
+            return self._format_feature_vector(self.last_stats)
+
+        new_data = df.iloc[self.processed_count:]
+        mapped_df = normalize_columns(new_data)[self.features]
+        
+        self.last_stats = self.extractor.update(mapped_df)
+        self.processed_count = len(df)
+        
+        return self._format_feature_vector(self.last_stats)
+
+    def _format_feature_vector(self, stats):
+        feature_vector = [stats.get(name, 0.0) for name in self.feature_names]
+        return np.array(feature_vector).reshape(1, -1)
+
+    def predict(self, df_window):
+        if len(df_window) < 2:
+            return None
+            
+        X = self.extract_features(df_window)
+        if X is None:
+            return None
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            X_scaled = self.scaler.transform(X)
+            prediction = self.model.predict(X_scaled)[0]
+            
+        return {
+            "remaining_angle": float(prediction)
+        }
+
 class LSTMModel(nn.Module):
     def __init__(self, input_size, hidden_size=64, num_layers=2):
         super(LSTMModel, self).__init__()

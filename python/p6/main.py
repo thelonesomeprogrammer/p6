@@ -6,7 +6,7 @@ import pandas as pd
 from flask import request
 from ._p6 import lttb_indices
 from .collector import Collector
-from .predictor import MLPredictor, RegressionPredictor, LSTMPredictor
+from .predictor import MLPredictor, RegressionPredictor, LSTMPredictor, SlidingPredictor
 import os
 
 # create flask app
@@ -20,12 +20,14 @@ predictor_rf = None
 predictor_gb = None
 predictor_reg_rf = None
 predictor_lstm = None
+predictor_slide = None
 
 try:
     predictor_rf = MLPredictor(model_type="rf")
     predictor_gb = MLPredictor(model_type="gb")
     predictor_reg_rf = RegressionPredictor(model_type="rf_regressor")
     predictor_lstm = LSTMPredictor()
+    predictor_slide = SlidingPredictor(model_type="rf")
 except Exception as e:
     print(f"Warning: ML Predictors not loaded: {e}")
 
@@ -77,6 +79,8 @@ def predict_remaining():
     model_type = request.args.get('model', default='rf', type=str)
     if model_type == 'lstm' and predictor_lstm:
         predictor = predictor_lstm
+    elif model_type == 'sliding' and predictor_slide:
+        predictor = predictor_slide
     else:
         predictor = predictor_reg_rf
 
@@ -124,6 +128,7 @@ def predict_all():
         predictor.reset()
         if predictor_reg_rf: predictor_reg_rf.reset()
         if predictor_lstm: predictor_lstm.reset()
+        if predictor_slide: predictor_slide.reset()
 
         # 4 window stops: 25%, 50%, 75%, 100%
         for i in range(1, 5):
@@ -139,6 +144,8 @@ def predict_all():
                 # Use LSTM if requested, otherwise fallback to RF
                 if model_type == 'lstm' and predictor_lstm:
                     reg_res = predictor_lstm.predict(window)
+                elif model_type == 'sliding' and predictor_slide:
+                    reg_res = predictor_slide.predict(window)
                 elif predictor_reg_rf:
                     reg_res = predictor_reg_rf.predict(window)
                 else:

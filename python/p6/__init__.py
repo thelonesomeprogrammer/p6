@@ -7,7 +7,8 @@ from .p6_api import (
     start_socket_faker,
     train_classification,
     train_lstm_remaining,
-    train_regression_remaining
+    train_regression_remaining,
+    train_regression_sliding
 )
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "start_socket_faker",
     "train_classification",
     "train_lstm_remaining",
-    "train_regression_remaining"
+    "train_regression_remaining",
+    "train_regression_sliding"
 ]
