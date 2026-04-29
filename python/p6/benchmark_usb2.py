@@ -4,6 +4,8 @@ import time
 import pandas as pd
 import numpy as np
 import joblib
+import torch
+import torch.nn as nn
 from sklearn.metrics import mean_absolute_error, r2_score
 
 # Ensure we can import from the current directory
@@ -13,15 +15,42 @@ sys.path.append(os.getcwd())
 try:
     import utils
     from extractor import ExpandingFeatureExtractor
-    from fast_predictor import FastRFPredictor
 except ImportError:
     try:
         from p6 import utils
         from p6.extractor import ExpandingFeatureExtractor
-        from p6.fast_predictor import FastRFPredictor
     except ImportError:
-        print("Error: Could not import utils, extractor or fast_predictor.")
+        print("Error: Could not import utils or extractor. Ensure you are in the p6/python/p6 directory.")
         sys.exit(1)
+
+# ==========================================
+# CNN-LSTM Architecture Definition
+# ==========================================
+class CNN_LSTM(nn.Module):
+    def __init__(self, seq_len=200):
+        super(CNN_LSTM, self).__init__()
+        self.conv1 = nn.Conv1d(in_channels=1, out_channels=64, kernel_size=5, padding=2)
+        self.pool1 = nn.MaxPool1d(kernel_size=2)
+        self.conv2 = nn.Conv1d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
+        self.pool2 = nn.MaxPool1d(kernel_size=2)
+        
+        self.lstm = nn.LSTM(input_size=64, hidden_size=32, batch_first=True)
+        
+        self.fc1 = nn.Linear(32, 16)
+        self.fc2 = nn.Linear(16, 1)
+
+    def forward(self, x):
+        x = torch.relu(self.conv1(x))
+        x = self.pool1(x)
+        x = torch.relu(self.conv2(x))
+        x = self.pool2(x)
+        
+        x = x.transpose(1, 2)
+        out, (hn, cn) = self.lstm(x)
+        x = out[:, -1,:]
+        x = torch.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
 
 # Constants
 USB_DIR = "usb"
@@ -50,8 +79,6 @@ TOP_FEATURES_TSFEL = [
 "torque_Wavelet variance_69.44Hz",
 ]
 
-
-
 OLD_TOP_FEATURES_TSFEL = [
     "torque_Max", "torque_Spectrogram mean coefficient_201.53Hz", "torque_Skewness",
     "torque_Spectrogram mean coefficient_40.31Hz", "torque_Min", "torque_Peak to peak distance",
@@ -60,7 +87,6 @@ OLD_TOP_FEATURES_TSFEL = [
     "torque_Spectrogram mean coefficient_67.18Hz", "torque_Spectral centroid",
     "torque_Wavelet variance_104.13Hz", "torque_Spectrogram mean coefficient_80.61Hz",
 ]
-
 
 TOP_FEATURES_TSFRESH = [
 "value__time_reversal_asymmetry_statistic__lag_2",
@@ -218,28 +244,29 @@ def extract_tsfresh_features(df_window, feature_list=TOP_FEATURES_TSFRESH):
 def benchmark_model(model_name, model_path, data, feat_type, sub_model_key=None):
     print(f"\nBenchmarking {model_name}...")
 
-    # Load model
     scaler = None
     feature_names = None
     
-    if model_path.endswith('.joblib'):
-        loaded = joblib.load(model_path)
-        if isinstance(loaded, dict) and "scaler" in loaded:
-            model = loaded[sub_model_key]
-            scaler = loaded["scaler"]
-            feature_names = loaded["features"]
-        else:
-            model = loaded
-            if isinstance(model, dict) and "model" in model:
-                model = model["model"]
+    # Model loading
+    if feat_type == "pytorch":
+        model = CNN_LSTM(seq_len=200)
+        model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+        model.eval()
     else:
-        model = joblib.load(model_path)
-        if isinstance(model, dict) and "model" in model:
-            model = model["model"]
-
-    # Force n_jobs=1 for single-sample prediction efficiency
-    if hasattr(model, "n_jobs"):
-        model.n_jobs = 1
+        if model_path.endswith('.joblib') or model_path.endswith('.pkl'):
+            loaded = joblib.load(model_path)
+            if isinstance(loaded, dict) and "scaler" in loaded:
+                model = loaded[sub_model_key]
+                scaler = loaded["scaler"]
+                feature_names = loaded["features"]
+            else:
+                model = loaded
+                if isinstance(model, dict) and "model" in model:
+                    model = model["model"]
+            
+            # Force n_jobs=1 for single-sample prediction efficiency
+            if hasattr(model, "n_jobs"):
+                model.n_jobs = 1
 
     y_true = []
     y_pred = []
@@ -258,14 +285,21 @@ def benchmark_model(model_name, model_path, data, feat_type, sub_model_key=None)
         for start in range(0, n_rows - window_size + 1, step_size):
             window = df.iloc[start : start + window_size]
 
-            # 1. Feature extraction
+            # 1. Feature extraction / formatting
             try:
                 start_ext = time.perf_counter()
                 if feat_type == "tsfresh":
                     X = extract_tsfresh_features(window, feature_list=sub_model_key)
                 elif feat_type == "tsfel":
                     X = extract_tsfel_features(window)
-                else:
+                elif feat_type == "tsf_raw":
+                    # Time Series Forest typically uses raw array directly. Reshaping to (1, 200)
+                    X = window["Torque (Nm)"].values.reshape(1, -1)
+                elif feat_type == "pytorch":
+                    # CNN_LSTM expects inputs of shape (batch_size, channels, sequence_length)
+                    raw_values = window["Torque (Nm)"].values
+                    X = torch.tensor(raw_values, dtype=torch.float32).view(1, 1, -1)
+                else: # sliding / standard
                     X = extract_raw_features(window, feature_names=feature_names)
                 end_ext = time.perf_counter()
             except Exception as e:
@@ -279,11 +313,16 @@ def benchmark_model(model_name, model_path, data, feat_type, sub_model_key=None)
 
             # 2. Prediction
             try:
-                if scaler:
-                    X = scaler.transform(X)
-                    
                 start_pred = time.perf_counter()
-                pred = model.predict(X)[0]
+                
+                if feat_type == "pytorch":
+                    with torch.no_grad():
+                        pred = model(X).item()
+                else:
+                    if scaler:
+                        X = scaler.transform(X)
+                    pred = model.predict(X)[0]
+                    
                 end_pred = time.perf_counter()
             except Exception as e:
                 print(f"Prediction error in {model_name}: {e}")
@@ -321,76 +360,6 @@ def benchmark_model(model_name, model_path, data, feat_type, sub_model_key=None)
     }
 
 
-def benchmark_fast_model(model_name, model_path, data, sub_model_key=None):
-    print(f"\nBenchmarking {model_name} (Rust Optimized)...")
-
-    try:
-        predictor = FastRFPredictor(model_path, sub_model_key=sub_model_key)
-    except Exception as e:
-        print(f"Failed to load fast predictor: {e}")
-        return None
-
-    y_true = []
-    y_pred = []
-    total_times = []
-
-    window_size = 200
-    step_size = 50
-
-    for item in data:
-        df = item["df"]
-        n_rows = len(df)
-        if n_rows < window_size:
-            continue
-            
-        predictor.reset()
-
-        for start in range(0, n_rows - window_size + 1, step_size):
-            window = df.iloc[start : start + window_size]
-
-            try:
-                predictor.reset() # Match training logic where each window is independent
-                start_time = time.perf_counter()
-                res = predictor.predict(window)
-                end_time = time.perf_counter()
-            except Exception as e:
-                print(f"Prediction error in {model_name}: {e}")
-                continue
-
-            if res is None:
-                continue
-
-            total_times.append(end_time - start_time)
-            pred = res["remaining_angle"]
-
-            # Target for this window
-            current_angle = window[utils.TARGET_COLUMN].iloc[-1]
-            remaining_angle = item["target"] - current_angle
-            if remaining_angle < 0:
-                remaining_angle = 0
-
-            y_true.append(remaining_angle)
-            y_pred.append(pred)
-
-    if not y_true:
-        print("No samples benchmarked.")
-        return None
-
-    mae = mean_absolute_error(y_true, y_pred)
-    r2 = r2_score(y_true, y_pred)
-
-    avg_total = np.mean(total_times) * 1000  # ms
-
-    return {
-        "Model": model_name,
-        "MAE": mae,
-        "R2": r2,
-        "Ext (ms)": 0.0,  # Combined in Rust
-        "Pred (ms)": 0.0, # Combined in Rust
-        "Total (ms)": avg_total,
-    }
-
-
 def main():
     data = load_benchmark_data()
     if not data:
@@ -403,22 +372,21 @@ def main():
         ("XGB TSFresh", os.path.join(USB_DIR, "xgb_ot_best_tsfresh.pkl"), "tsfresh", TOP_FEATURES_TSFRESH_XGB),
         ("RF Sliding",  os.path.join(USB_DIR, "regressors_slide.joblib"), "sliding", "rf"),
         ("XGB Sliding", os.path.join(USB_DIR, "regressors_slide.joblib"), "sliding", "xgb"),
-        ("RF Rust",     os.path.join(USB_DIR, "regressors_slide.joblib"), "rust",    "rf"),
+        ("TSF Raw",     os.path.join(USB_DIR, "tsf_ot_best_raw.pkl"),     "tsf_raw", None),
+        ("CNN-LSTM",    os.path.join(USB_DIR, "cnn_lstm_finetuned_old.pth"), "pytorch", None),
     ]
 
     results = []
     for name, path, feat_type, sub_key in models_to_test:
-        # Check both USB_DIR and current directory for sliding models
+        # Check both USB_DIR and current directory for models
         actual_path = path
-        if not os.path.exists(actual_path) and ("regressors_slide.joblib" in path or "regressors_slide.joblib" in name):
-            if os.path.exists("regressors_slide.joblib"):
-                actual_path = "regressors_slide.joblib"
+        if not os.path.exists(actual_path):
+            filename = os.path.basename(path)
+            if os.path.exists(filename):
+                actual_path = filename
         
         if os.path.exists(actual_path):
-            if feat_type == "rust":
-                res = benchmark_fast_model(name, actual_path, data, sub_key)
-            else:
-                res = benchmark_model(name, actual_path, data, feat_type, sub_key)
+            res = benchmark_model(name, actual_path, data, feat_type, sub_key)
             if res:
                 results.append(res)
         else:

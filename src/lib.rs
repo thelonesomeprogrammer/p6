@@ -5,6 +5,7 @@ use numpy::PyReadonlyArray1;
 mod types;
 mod common;
 mod expanding;
+mod rf;
 
 #[pyfunction]
 fn lttb_indices(data_x: PyReadonlyArray1<f64>, data_y: PyReadonlyArray1<f64>, threshold: usize) -> Vec<usize> {
@@ -75,5 +76,6 @@ fn lttb_indices(data_x: PyReadonlyArray1<f64>, data_y: PyReadonlyArray1<f64>, th
 fn _p6(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(lttb_indices, m)?)?;
     m.add_class::<expanding::ExpandingExtractor>()?;
+    m.add_class::<rf::RFPredictor>()?;
     Ok(())
 }
