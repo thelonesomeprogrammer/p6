@@ -1,14 +1,18 @@
 #![feature(portable_simd)]
-use pyo3::prelude::*;
 use numpy::PyReadonlyArray1;
+use pyo3::prelude::*;
 
-mod types;
 mod common;
-mod expanding;
 mod rf;
+mod sliding;
+mod types;
 
 #[pyfunction]
-fn lttb_indices(data_x: PyReadonlyArray1<f64>, data_y: PyReadonlyArray1<f64>, threshold: usize) -> Vec<usize> {
+fn lttb_indices(
+    data_x: PyReadonlyArray1<f64>,
+    data_y: PyReadonlyArray1<f64>,
+    threshold: usize,
+) -> Vec<usize> {
     let x = data_x.as_array();
     let y = data_y.as_array();
     let n_points = x.len();
@@ -39,7 +43,7 @@ fn lttb_indices(data_x: PyReadonlyArray1<f64>, data_y: PyReadonlyArray1<f64>, th
         let mut avg_x_next = 0.0;
         let mut avg_y_next = 0.0;
         let next_bin_len = (next_end - next_start) as f64;
-        
+
         if next_bin_len > 0.0 {
             for j in next_start..next_end {
                 avg_x_next += x[j];
@@ -59,7 +63,11 @@ fn lttb_indices(data_x: PyReadonlyArray1<f64>, data_y: PyReadonlyArray1<f64>, th
         for j in start..end {
             // Area = 0.5 * |x1(y2-y3) + x2(y3-y1) + x3(y1-y2)|
             // a: (a_x, a_y), b: (x[j], y[j]), c: (avg_x_next, avg_y_next)
-            let area = 0.5 * (a_x * (y[j] - avg_y_next) + x[j] * (avg_y_next - a_y) + avg_x_next * (a_y - y[j])).abs();
+            let area = 0.5
+                * (a_x * (y[j] - avg_y_next)
+                    + x[j] * (avg_y_next - a_y)
+                    + avg_x_next * (a_y - y[j]))
+                    .abs();
             if area > max_area {
                 max_area = area;
                 selected_index = j;
@@ -72,10 +80,16 @@ fn lttb_indices(data_x: PyReadonlyArray1<f64>, data_y: PyReadonlyArray1<f64>, th
     indices
 }
 
+#[pyfunction]
+fn canonicalize_feature_name(name: String) -> String {
+    types::Feature::from(name).name()
+}
+
 #[pymodule]
 fn _p6(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(lttb_indices, m)?)?;
-    m.add_class::<expanding::ExpandingExtractor>()?;
+    m.add_function(wrap_pyfunction!(canonicalize_feature_name, m)?)?;
+    m.add_class::<sliding::SlidingExtractor>()?;
     m.add_class::<rf::RFPredictor>()?;
     Ok(())
 }

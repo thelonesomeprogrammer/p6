@@ -6,21 +6,31 @@ import numpy as np
 import joblib
 from sklearn.metrics import mean_absolute_error, r2_score
 
-# Ensure we can import from the current directory
-sys.path.append(os.getcwd())
+# Ensure we can import from the directory where the script is located
+script_dir = os.path.dirname(os.path.abspath(__file__))
+if script_dir not in sys.path:
+    sys.path.insert(0, script_dir)
 
-# Import models/utils from local project if available
+# If we are in the 'p6' package directory, add the parent so 'from p6 import ...' works
+if os.path.basename(script_dir) == 'p6':
+    parent_dir = os.path.dirname(script_dir)
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
+
+# Import models/utils
 try:
-    import utils
-    from extractor import ExpandingFeatureExtractor
-    from fast_predictor import FastRFPredictor
+    # Try as package imports first
+    from p6 import utils
+    from p6.extractor import ExpandingFeatureExtractor
+    from p6.fast_predictor import FastRFPredictor
 except ImportError:
     try:
-        from p6 import utils
-        from p6.extractor import ExpandingFeatureExtractor
-        from p6.fast_predictor import FastRFPredictor
+        # Try as local imports
+        import utils
+        from extractor import ExpandingFeatureExtractor
+        from fast_predictor import FastRFPredictor
     except ImportError:
-        print("Error: Could not import utils, extractor or fast_predictor.")
+        print("Error: Could not import utils, extractor or fast_predictor. Ensure p6 is installed or you are in the p6/python/p6 directory.")
         sys.exit(1)
 
 # Constants
