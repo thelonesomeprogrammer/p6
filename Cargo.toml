@@ -2,6 +2,8 @@
 name = "p6"
 version = "0.1.0"
 edition = "2024"
+description = "Native Rust core for the Screw Quality Monitoring System"
+license = "GPL-3.0-only"
 
 [lib]
 name = "_p6"
