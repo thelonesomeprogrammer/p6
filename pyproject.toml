@@ -23,7 +23,8 @@ dependencies = [
     "pyarrow",
     "matplotlib>=3.10.8",
     "watchdog>=6.0.0",
-		"sktime>=0.40.0",
+    "sktime>=0.40.0",
+    "pyscrew>=1.2.2",
 ]
 
 [build-system]
