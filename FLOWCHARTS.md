@@ -126,11 +126,12 @@ sequenceDiagram
     participant Tool as Screwdriver Tool
     participant BE as Backend
     participant FE as Frontend
+    participant UR as UR10
 
     PLC->>BE: Signal HIGH (screw start)
 
     loop Screw in progress
-        BE->>BE: Append Modbus register values
+c
     end
 
     PLC->>BE: Signal LOW (screw done)
@@ -147,6 +148,53 @@ sequenceDiagram
 
     FE->>BE: GET /predict_all?model=rf
     BE->>FE: predictions [{window%, label, remaining_angle}]
+```
+
+real time
+```mermaid
+sequenceDiagram
+    participant PLC as PLC
+    participant Tool as Screwdriver Tool
+    participant BE as Backend
+    participant FE as Frontend
+    participant UR as UR10
+
+    PLC->>BE: Signal HIGH (screw start)
+
+    loop Screw in progress
+        BE->>UR: Modbus read register
+        UR->>BE: Restult
+        Tool->>BE: Append Screwdriver data
+        BE->>FE: predictions [{window%, label, remaining_angle}]
+        BE->>FE: Updata data
+    end
+
+    PLC->>BE: Signal LOW (screw done)
+```
+
+real time db
+```mermaid
+sequenceDiagram
+    participant PLC as PLC
+    participant Tool as Screwdriver Tool
+    participant BE as Backend
+    participant DB as Database
+    participant FE as Frontend
+    participant UR as UR10
+
+    PLC->>BE: Signal HIGH (screw start)
+
+    loop Screw in progress
+        BE->>UR: Modbus read register
+        UR->>BE: Restult
+        Tool->>BE: Append Screwdriver data
+        BE->>DB: predictions [{window%, label, remaining_angle}]
+        BE->>DB: Updata data
+    end
+
+    PLC->>BE: Signal LOW (screw done)
+
+    DB ->> FE: pull data on demand
 ```
 
 ---
