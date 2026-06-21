@@ -131,7 +131,8 @@ sequenceDiagram
     PLC->>BE: Signal HIGH (screw start)
 
     loop Screw in progress
-c
+        BE->>UR: Modbus read register
+        UR->>BE: Restult
     end
 
     PLC->>BE: Signal LOW (screw done)
